@@ -1,0 +1,42 @@
+configuration:
+  device_name:
+    name: Bluetooth name
+    description: Name shown on the projector, TV or phone (sets the alias of the selected adapter).
+  adapter:
+    name: Bluetooth adapter
+    description: hciX or MAC address of the dongle. Empty = first adapter.
+  discoverable:
+    name: Pairing mode
+    description: Visible and new devices may pair. Already paired devices can always reconnect.
+  discoverable_timeout:
+    name: Pairing mode duration (minutes)
+    description: Only visible for this long after start. 0 = always visible.
+  allowed_devices:
+    name: Allowed devices
+    description: List of MAC addresses. Empty = any device may pair while pairing mode is on.
+  delay_report_ms:
+    name: Reported delay (ms)
+    description: Reported to the projector/TV over Bluetooth so it delays the picture (lip sync).
+  enable_aac:
+    name: Offer AAC
+    description: Better quality; Android/Google TV prefers AAC. SBC is always available.
+  apply_remote_volume:
+    name: Follow device volume
+    description: Volume keys on the projector/phone control the Live Input level.
+  silence_timeout:
+    name: Silence until "no signal" (seconds)
+    description: After this much silence the input reports no signal. 0 = never.
+  stream_codec:
+    name: Codec to Music Assistant
+    description: pcm (lowest latency, default), flac or opus.
+  server_url:
+    name: Music Assistant address (optional)
+    description: e.g. ws://192.168.1.10:8927/sendspin – only if MA does not find the add-on via mDNS.
+  listen_port:
+    name: Port
+    description: Port Music Assistant uses to reach the add-on.
+  set_device_class:
+    name: Present as loudspeaker
+    description: Sets the Bluetooth device class to audio/loudspeaker so TVs list it as a speaker.
+  log_level:
+    name: Log level

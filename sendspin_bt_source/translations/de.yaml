@@ -1,0 +1,42 @@
+configuration:
+  device_name:
+    name: Bluetooth-Name
+    description: So erscheint das Gerät auf Beamer, TV und Handy (setzt den Namen des gewählten Adapters).
+  adapter:
+    name: Bluetooth-Adapter
+    description: hciX oder MAC-Adresse des Dongles. Leer = erster Adapter.
+  discoverable:
+    name: Kopplungsmodus
+    description: Gerät ist sichtbar und neue Geräte dürfen koppeln. Bereits gekoppelte Geräte verbinden sich immer.
+  discoverable_timeout:
+    name: Kopplungsmodus-Dauer (Minuten)
+    description: Nach dem Start nur so lange sichtbar. 0 = immer sichtbar.
+  allowed_devices:
+    name: Erlaubte Geräte
+    description: Liste von MAC-Adressen. Leer = jedes Gerät darf koppeln (während der Kopplungsmodus aktiv ist).
+  delay_report_ms:
+    name: Gemeldete Verzögerung (ms)
+    description: Wird per Bluetooth an Beamer/TV gemeldet, damit das Bild passend verzögert wird (Lippensynchronität).
+  enable_aac:
+    name: AAC anbieten
+    description: Bessere Qualität; Android/Google TV bevorzugt AAC. SBC steht immer zur Verfügung.
+  apply_remote_volume:
+    name: Lautstärke vom Gerät übernehmen
+    description: Lautstärketasten von Beamer/Handy regeln den Pegel des Live Inputs.
+  silence_timeout:
+    name: Stille bis "kein Signal" (Sekunden)
+    description: Nach so viel Stille meldet der Eingang "kein Signal" (MA stoppt Auto-Play nach einer Minute). 0 = nie.
+  stream_codec:
+    name: Codec zu Music Assistant
+    description: pcm (geringste Latenz, Standard), flac oder opus.
+  server_url:
+    name: Music-Assistant-Adresse (optional)
+    description: z. B. ws://192.168.1.10:8927/sendspin – nur nötig, wenn MA das Add-on nicht per mDNS findet.
+  listen_port:
+    name: Port
+    description: Port, auf dem Music Assistant das Add-on erreicht.
+  set_device_class:
+    name: Als Lautsprecher ausgeben
+    description: Setzt die Bluetooth-Geräteklasse auf Audio/Lautsprecher, damit TVs das Gerät als Box anzeigen.
+  log_level:
+    name: Log-Level

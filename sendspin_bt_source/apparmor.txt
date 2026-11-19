@@ -1,0 +1,26 @@
+#include <tunables/global>
+
+profile sendspin_bt_source flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Overlayfs paths make fine-grained file rules brittle; keep file access broad
+  # and restrict the rest.
+  file,
+  signal,
+  dbus,
+  unix,
+
+  network inet,
+  network inet6,
+  network netlink raw,
+  network bluetooth,
+  network raw,
+
+  capability net_admin,
+  capability net_raw,
+  capability setuid,
+  capability setgid,
+  capability dac_override,
+  capability chown,
+  capability fowner,
+}

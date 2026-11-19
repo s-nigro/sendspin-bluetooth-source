@@ -1,0 +1,51 @@
+name: Sendspin Bluetooth Source
+version: "0.1.0"
+slug: sendspin_bt_source
+description: >-
+  Bluetooth-Lautsprecher für Beamer, TV und Handy: Ton per Bluetooth empfangen
+  und als Live Input in Music Assistant (Sendspin) bereitstellen.
+url: https://github.com/s-nigro/sendspin-bluetooth-source
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: false
+host_network: true
+host_dbus: true
+homeassistant_api: true
+privileged:
+  - NET_ADMIN
+  - NET_RAW
+apparmor: true
+options:
+  device_name: "Camping Sound"
+  adapter: ""
+  discoverable: true
+  discoverable_timeout: 0
+  allowed_devices: []
+  delay_report_ms: 1000
+  enable_aac: true
+  apply_remote_volume: true
+  silence_timeout: 20
+  stream_codec: pcm
+  server_url: ""
+  listen_port: 8935
+  set_device_class: true
+  log_level: info
+schema:
+  device_name: str
+  adapter: str?
+  discoverable: bool
+  discoverable_timeout: int(0,1440)
+  allowed_devices:
+    - str
+  delay_report_ms: int(0,3000)
+  enable_aac: bool
+  apply_remote_volume: bool
+  silence_timeout: int(0,600)
+  stream_codec: list(pcm|flac|opus)
+  server_url: str?
+  listen_port: port
+  set_device_class: bool
+  log_level: list(debug|info|warning|error)
