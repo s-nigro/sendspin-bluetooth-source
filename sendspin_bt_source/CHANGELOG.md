@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Fix Ruckeln: Zeitstempel werden jetzt aus der Sampleanzahl gebildet statt aus der schwankenden Bluetooth-Ankunftszeit. Music Assistant hat bei jedem verspäteten Paket (> 15 ms) Stille eingefügt.
+
 ## 0.1.2
 
 - btmgmt ohne Terminal-Eingabe starten (Geräteklasse wurde wegen Timeout nicht gesetzt).

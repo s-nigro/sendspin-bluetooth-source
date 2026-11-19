@@ -23,6 +23,7 @@ from aiosendspin.noise.driver import HandshakeAbortedError
 from . import __version__
 from .a2dp import OUTPUT_CHANNELS, OUTPUT_RATE
 from .config import Options
+from .timing import CaptureClock
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,6 +65,8 @@ class SendspinLink:
         self._listener: ClientListener | None = None
         self._capture: SourceCapture | None = None
         self._capture_lock = asyncio.Lock()
+        self._clock = CaptureClock(OUTPUT_RATE)
+        self._clock_owner: SourceCapture | None = None
         self._signal = SignalState.ABSENT
         self._reported: tuple[int, SignalState] | None = None
         self._tasks: list[asyncio.Task] = []
@@ -223,8 +226,12 @@ class SendspinLink:
         capture = self._capture
         if capture is None or self.client is None:
             return
+        if capture is not self._clock_owner:
+            self._clock.reset()
+            self._clock_owner = capture
         age_us = max(0, (now_monotonic_ns - captured_monotonic_ns) // 1000)
-        ts = self.client.now_us() - age_us
+        frames = len(pcm) // (OUTPUT_CHANNELS * 2)
+        ts = self._clock.timestamp(self.client.now_us() - age_us, frames)
         try:
             await capture.feed(pcm, capture_timestamp_us=ts)
         except RuntimeError as err:
