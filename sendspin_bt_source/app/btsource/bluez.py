@@ -336,10 +336,11 @@ class BluezManager:
         index = self.adapter_path.rsplit("hci", 1)[-1]
         proc = await asyncio.create_subprocess_exec(
             btmgmt, "--index", index, "class", "4", "20",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
         try:
-            out, _ = await asyncio.wait_for(proc.communicate(), 10)
+            out, _ = await asyncio.wait_for(proc.communicate(), 5)
         except TimeoutError:
             proc.kill()
             _LOGGER.warning("btmgmt hat nicht geantwortet – Geräteklasse nicht gesetzt")

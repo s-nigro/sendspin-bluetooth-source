@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- btmgmt ohne Terminal-Eingabe starten (Geräteklasse wurde wegen Timeout nicht gesetzt).
+
 ## 0.1.1
 
 - Fix: Start schlug mit „No module named btsource“ fehl (s6-overlay setzt die Umgebung zurück).
