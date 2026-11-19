@@ -19,6 +19,8 @@ class Options:
     """Minutes the adapter stays discoverable after start; 0 = always."""
     allowed_devices: list[str] = field(default_factory=list)
     """MAC addresses allowed to pair/stream; empty = everyone (while discoverable)."""
+    remove_devices: list[str] = field(default_factory=list)
+    """MAC addresses to unpair from the adapter at start (to pair them again)."""
     delay_report_ms: int = 1000
     """Delay reported to the sending device so it can hold back the picture."""
     enable_aac: bool = True
@@ -49,6 +51,10 @@ class Options:
         for mac in self.allowed_devices:
             if not _MAC_RE.match(mac):
                 raise ValueError(f"allowed_devices: '{mac}' ist keine gültige MAC-Adresse")
+        self.remove_devices = [m.strip().upper() for m in self.remove_devices if m.strip()]
+        for mac in self.remove_devices:
+            if not _MAC_RE.match(mac):
+                raise ValueError(f"remove_devices: '{mac}' ist keine gültige MAC-Adresse")
         self.delay_report_ms = max(0, min(3000, int(self.delay_report_ms)))
         self.silence_timeout = max(0, int(self.silence_timeout))
         if self.stream_codec not in ("pcm", "flac", "opus"):

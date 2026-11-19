@@ -89,6 +89,13 @@ zweiten günstigen USB-Dongle nur für dieses Add-on verwenden (`adapter`).
 Beachte: `device_name` setzt den Namen des gewählten Adapters. Teilst du den
 Adapter mit der Bridge, heißt er für alle Geräte so.
 
+## Gekoppeltes Gerät entfernen
+
+Beim Start listet das Add-on im Log alle gekoppelten Geräte mit MAC-Adresse auf.
+Zum Entfernen die MAC unter `remove_devices` eintragen und das Add-on neu
+starten. Danach die Liste wieder leeren. Auf dem Gerät selbst (iPhone, Beamer)
+„Camping Sound“ ebenfalls vergessen bzw. entkoppeln, dann neu koppeln.
+
 ## Optionen
 
 | Option | Standard | Bedeutung |
@@ -98,6 +105,7 @@ Adapter mit der Bridge, heißt er für alle Geräte so.
 | `discoverable` | true | Kopplungsmodus an |
 | `discoverable_timeout` | 0 | Minuten sichtbar nach Start, 0 = immer |
 | `allowed_devices` | [] | nur diese MACs dürfen koppeln/streamen |
+| `remove_devices` | [] | diese MACs beim Start entkoppeln (danach wieder leeren) |
 | `delay_report_ms` | 1000 | an den Beamer gemeldete Verzögerung |
 | `enable_aac` | true | AAC zusätzlich zu SBC anbieten |
 | `apply_remote_volume` | true | Lautstärketasten des Geräts übernehmen |

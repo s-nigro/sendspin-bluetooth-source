@@ -14,6 +14,9 @@ configuration:
   allowed_devices:
     name: Allowed devices
     description: List of MAC addresses. Empty = any device may pair while pairing mode is on.
+  remove_devices:
+    name: Remove devices (unpair)
+    description: MAC addresses unpaired at start, e.g. to pair them again. Paired devices are listed in the log at start. Clear the list afterwards.
   delay_report_ms:
     name: Reported delay (ms)
     description: Reported to the projector/TV over Bluetooth so it delays the picture (lip sync).

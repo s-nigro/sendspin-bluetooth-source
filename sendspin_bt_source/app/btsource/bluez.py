@@ -235,6 +235,7 @@ class BluezManager:
         self.bus = await MessageBus(bus_type=BusType.SYSTEM, negotiate_unix_fd=True).connect()
         await self._find_adapter()
         await self._configure_adapter()
+        await self._forget_and_list_devices()
         await self._add_match("type='signal',sender='org.bluez'")
         self.bus.add_message_handler(self._on_message)
         await self._add_match(
@@ -289,6 +290,37 @@ class BluezManager:
                 body=[rule],
             )
         )
+
+    async def _forget_and_list_devices(self) -> None:
+        """Unpair the devices from ``remove_devices`` and log what stays paired."""
+        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
+        prefix = self.adapter_path + "/dev_"
+        devices = {
+            path: unwrap(ifaces[IFACE_DEVICE])
+            for path, ifaces in reply.body[0].items()
+            if path.startswith(prefix) and IFACE_DEVICE in ifaces
+        }
+        for path, props in list(devices.items()):
+            address = props.get("Address", address_from_path(path))
+            if address.upper() not in self.options.remove_devices:
+                continue
+            try:
+                await self._call(self.adapter_path, IFACE_ADAPTER, "RemoveDevice", "o", [path])
+                _LOGGER.info("Gerät %s (%s) entfernt – kann jetzt neu gekoppelt werden",
+                             address, props.get("Alias", "?"))
+                del devices[path]
+            except DBusError as err:
+                _LOGGER.warning("Gerät %s konnte nicht entfernt werden: %s", address, err)
+        for mac in self.options.remove_devices:
+            if not any(p.get("Address", "").upper() == mac for p in devices.values()):
+                _LOGGER.info("Zu entfernendes Gerät %s ist nicht (mehr) gekoppelt", mac)
+        paired = [p for p in devices.values() if p.get("Paired")]
+        if paired:
+            _LOGGER.info("Gekoppelte Geräte an diesem Adapter:")
+            for props in paired:
+                _LOGGER.info("  %s  %s", props.get("Address", "?"), props.get("Alias", "?"))
+        else:
+            _LOGGER.info("Keine gekoppelten Geräte an diesem Adapter")
 
     async def _find_adapter(self) -> None:
         reply = await self._call("/", IFACE_OM, "GetManagedObjects")

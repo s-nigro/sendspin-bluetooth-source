@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Neue Option `remove_devices`: gekoppelte Bluetooth-Geräte beim Start entkoppeln.
+- Gekoppelte Geräte werden beim Start im Log aufgelistet.
+
 ## 0.2.3
 
 - Log zeigt Verbinden/Trennen von Music Assistant.

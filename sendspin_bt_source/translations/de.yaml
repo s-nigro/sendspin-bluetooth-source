@@ -14,6 +14,9 @@ configuration:
   allowed_devices:
     name: Erlaubte Geräte
     description: Liste von MAC-Adressen. Leer = jedes Gerät darf koppeln (während der Kopplungsmodus aktiv ist).
+  remove_devices:
+    name: Geräte entfernen (entkoppeln)
+    description: MAC-Adressen, die beim Start entkoppelt werden, z. B. um sie neu zu koppeln. Die gekoppelten Geräte stehen beim Start im Log. Danach wieder leeren.
   delay_report_ms:
     name: Gemeldete Verzögerung (ms)
     description: Wird per Bluetooth an Beamer/TV gemeldet, damit das Bild passend verzögert wird (Lippensynchronität).
