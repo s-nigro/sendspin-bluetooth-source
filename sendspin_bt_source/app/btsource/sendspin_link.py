@@ -131,6 +131,7 @@ class SendspinLink:
 
     async def _handle_server_connection(self, ws: web.WebSocketResponse) -> None:
         assert self.client is not None
+        _LOGGER.info("Music Assistant verbindet sich")
         try:
             await self.client.attach_websocket(ws)
         except Exception:  # noqa: BLE001 - keep listener alive
@@ -168,6 +169,8 @@ class SendspinLink:
         _LOGGER.warning("Kopplung mit Music Assistant abgebrochen: %s", reason.value)
 
     def _on_disconnect(self) -> None:
+        if self._reported is not None:
+            _LOGGER.info("Verbindung zu Music Assistant getrennt")
         self._capture = None
         self._reported = None
 
@@ -204,6 +207,8 @@ class SendspinLink:
             return
         # signal state (line_sense)
         key = (id(conn), self._signal)
+        if self._reported is None or self._reported[0] != id(conn):
+            _LOGGER.info("Mit Music Assistant verbunden")
         if self._reported != key:
             await conn.send_source_signal(self._signal)
             self._reported = key

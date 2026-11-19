@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Log zeigt Verbinden/Trennen von Music Assistant.
+
 ## 0.2.2
 
 - Kein Traceback mehr beim Stoppen/Neustarten während der Wiedergabe (Bluetooth-Verbindung wird vor dem Trennen von D-Bus freigegeben).
