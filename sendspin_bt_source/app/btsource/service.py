@@ -6,11 +6,14 @@ import asyncio
 import contextlib
 import logging
 import time
+from pathlib import Path
 
 from . import a2dp
 from .bluez import BluezManager, StreamListener, TransportInfo
 from .config import Options
+from .devices import DeviceStore
 from .sendspin_link import SendspinLink
+from .webui import WebUI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,13 +115,22 @@ class Service:
         self.options = options
         self.link = SendspinLink(options, data_dir, on_pairing_code=notifier)
         self.pipeline = AudioPipeline(options, self.link)
+        self.store = DeviceStore(Path(data_dir) / "devices.json", options.delay_report_ms)
         self.bluez: BluezManager | None = None
+        self.webui: WebUI | None = None
 
     async def run(self) -> None:
         await self.link.start()
         self.pipeline.start()
-        self.bluez = BluezManager(self.options, self.pipeline)
+        self.bluez = BluezManager(self.options, self.pipeline, self.store)
         await self.bluez.start()
+        if self.options.web_port:
+            self.webui = WebUI(self.bluez, self.link, self.options.web_port)
+            try:
+                await self.webui.start()
+            except OSError as err:
+                _LOGGER.error("Geräteverwaltung konnte nicht starten (Port %d): %s", self.options.web_port, err)
+                self.webui = None
         _LOGGER.info("Bereit. Gerät '%s' per Bluetooth koppeln und Wiedergabe starten.", self.options.device_name)
         try:
             await asyncio.Event().wait()
@@ -126,6 +138,9 @@ class Service:
             await self.shutdown()
 
     async def shutdown(self) -> None:
+        if self.webui is not None:
+            with contextlib.suppress(Exception):
+                await self.webui.stop()
         if self.bluez is not None:
             with contextlib.suppress(Exception):
                 await self.bluez.stop()

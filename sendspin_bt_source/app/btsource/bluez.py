@@ -21,6 +21,7 @@ from dbus_fast.aio import MessageBus
 from dbus_fast.service import ServiceInterface, method
 
 from . import a2dp, mgmt
+from .devices import DeviceStore
 from .config import Options
 
 _LOGGER = logging.getLogger(__name__)
@@ -185,9 +186,11 @@ class SinkEndpoint(ServiceInterface):
 
 
 class BluezManager:
-    def __init__(self, options: Options, listener: StreamListener) -> None:
+    def __init__(self, options: Options, listener: StreamListener, store: DeviceStore | None = None) -> None:
         self.options = options
         self.listener = listener
+        self.store = store or DeviceStore(None, options.delay_report_ms)
+        self.pairing_until: float | None = None  # monotonic deadline of a timed pairing window
         self.bus: MessageBus | None = None
         self.adapter_path = ""
         self.adapter_address = ""
@@ -246,9 +249,7 @@ class BluezManager:
             self.bus.export(path, ep)
         await self._register_with_bluez()
         if self.options.discoverable and self.options.discoverable_timeout > 0:
-            self._discoverable_task = self._loop.create_task(
-                self._close_pairing_after(self.options.discoverable_timeout * 60)
-            )
+            self._start_pairing_timer(self.options.discoverable_timeout * 60)
         self._spawn(self._keep_default_agent())
 
     async def _register_with_bluez(self) -> None:
@@ -431,7 +432,103 @@ class BluezManager:
 
     async def _close_pairing_after(self, seconds: int) -> None:
         await asyncio.sleep(seconds)
+        self.pairing_until = None
+        self._discoverable_task = None
         await self.set_pairing(False)
+
+    def _start_pairing_timer(self, seconds: int) -> None:
+        if self._discoverable_task is not None:
+            self._discoverable_task.cancel()
+        self.pairing_until = time.monotonic() + seconds
+        self._discoverable_task = self._loop.create_task(self._close_pairing_after(seconds))
+
+    @property
+    def pairing_always_on(self) -> bool:
+        return self.options.discoverable and self.options.discoverable_timeout == 0
+
+    async def open_pairing(self, seconds: int) -> None:
+        """Make the adapter visible and pairable for ``seconds`` (no-op while always on)."""
+        if self.pairing_always_on:
+            return
+        await self.set_pairing(True)
+        self._start_pairing_timer(seconds)
+
+    async def close_pairing(self) -> None:
+        if self.pairing_always_on:
+            return
+        if self._discoverable_task is not None:
+            self._discoverable_task.cancel()
+            self._discoverable_task = None
+        self.pairing_until = None
+        await self.set_pairing(False)
+
+    # -- device management -------------------------------------------------------
+
+    async def _adapter_devices(self) -> dict[str, dict]:
+        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
+        prefix = self.adapter_path + "/dev_"
+        return {
+            path: unwrap(ifaces[IFACE_DEVICE])
+            for path, ifaces in reply.body[0].items()
+            if path.startswith(prefix) and IFACE_DEVICE in ifaces
+        }
+
+    async def list_devices(self) -> list[dict]:
+        """Devices on our adapter. ``source`` marks phones/TVs (vs. speakers of the BT bridge)."""
+        out = []
+        for path, props in (await self._adapter_devices()).items():
+            address = str(props.get("Address", address_from_path(path))).upper()
+            uuids = {str(u).lower() for u in props.get("UUIDs", [])}
+            live = [t for t in self.transports.values() if t.address.upper() == address]
+            if not (props.get("Paired") or live or self.store.known(address)):
+                continue  # merely discovered nearby
+            out.append({
+                "address": address,
+                "name": str(props.get("Alias") or props.get("Name") or address),
+                "paired": bool(props.get("Paired")),
+                "trusted": bool(props.get("Trusted")),
+                "connected": bool(props.get("Connected")),
+                "source": a2dp.A2DP_SOURCE_UUID in uuids or self.store.known(address) or bool(live),
+                "streaming": any(t.fd is not None for t in live),
+                "codec": live[-1].config.description if live else None,
+                "delay_ms": self.store.delay_for(address),
+                "custom_delay": self.store.custom_delay(address) is not None,
+            })
+        out.sort(key=lambda d: (not d["source"], d["name"].lower()))
+        return out
+
+    async def _device_path(self, address: str) -> str:
+        address = address.upper()
+        for path, props in (await self._adapter_devices()).items():
+            if str(props.get("Address", address_from_path(path))).upper() == address:
+                return path
+        raise KeyError(address)
+
+    async def remove_device(self, address: str) -> None:
+        """Unpair a device so it can be paired again."""
+        address = address.upper()
+        for info in [t for t in self.transports.values() if t.address.upper() == address]:
+            self._close_transport(info, release=False)
+        try:
+            path = await self._device_path(address)
+        except KeyError:
+            self.store.forget(address)
+            return
+        await self._call(self.adapter_path, IFACE_ADAPTER, "RemoveDevice", "o", [path])
+        self.store.forget(address)
+        _LOGGER.info("Gerät %s entfernt – kann jetzt neu gekoppelt werden", address)
+
+    async def disconnect_device(self, address: str) -> None:
+        path = await self._device_path(address)
+        await self._call(path, IFACE_DEVICE, "Disconnect")
+        _LOGGER.info("Gerät %s getrennt", address.upper())
+
+    async def set_device_delay(self, address: str, delay_ms: int | None) -> int:
+        """Store a device's delay and report it right away if it is connected."""
+        effective = self.store.set_delay(address, delay_ms)
+        for info in [t for t in self.transports.values() if t.address.upper() == address.upper()]:
+            await self.push_delay(info)
+        return effective
 
     async def set_pairing(self, enabled: bool) -> None:
         self.pairing_open = enabled
@@ -474,6 +571,7 @@ class BluezManager:
             info.name = await self.get_prop(info.device_path, IFACE_DEVICE, "Alias")
         except DBusError:
             info.name = info.address
+        self.store.remember(info.address, info.name)
         await self.push_delay(info, quiet=True)
         # Make sure reconnects work without a new pairing.
         try:
@@ -496,7 +594,8 @@ class BluezManager:
         BlueZ forwards it as an AVDTP delay report; the transport must be open for that,
         so a failure before the stream starts is expected and only logged at debug level.
         """
-        value = self.options.delay_report_ms * 10  # 1/10 ms units
+        delay_ms = self.store.delay_for(info.address)
+        value = delay_ms * 10  # 1/10 ms units
         try:
             await self.set_prop(info.path, IFACE_TRANSPORT, "Delay", "q", value)
         except DBusError as err:
@@ -509,7 +608,7 @@ class BluezManager:
                     "kein Delay Reporting oder die BlueZ-Version des Hosts ist zu alt.", err
                 )
             return False
-        _LOGGER.info("Verzögerung %d ms an %s gemeldet", self.options.delay_report_ms, info.name or info.address)
+        _LOGGER.info("Verzögerung %d ms an %s gemeldet", delay_ms, info.name or info.address)
         return True
 
     # -- signals -----------------------------------------------------------------------

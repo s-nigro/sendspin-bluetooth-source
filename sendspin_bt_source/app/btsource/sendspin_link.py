@@ -221,6 +221,14 @@ class SendspinLink:
         self._signal = SignalState.PRESENT if present else SignalState.ABSENT
 
     @property
+    def ma_connected(self) -> bool:
+        return self._connection() is not None
+
+    @property
+    def signal_present(self) -> bool:
+        return self._signal == SignalState.PRESENT
+
+    @property
     def streaming(self) -> bool:
         """True while Music Assistant has asked for audio and the stream is open."""
         return self._capture is not None

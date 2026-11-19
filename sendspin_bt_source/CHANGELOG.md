@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Neue Geräteverwaltung in der HA-Seitenleiste („Bluetooth-Quelle“):
+  Status, Kopplungsmodus auf Zeit, Trennen, Entfernen, Verzögerung pro Gerät –
+  alles ohne Neustart.
+- Verzögerung pro Gerät wird in `/data/devices.json` gespeichert und sofort an
+  ein verbundenes Gerät gemeldet.
+
 ## 0.4.0
 
 - `server_url: auto`: Das Add-on verbindet sich selbst mit Music Assistant auf diesem Rechner (127.0.0.1, dann LAN-IP), statt auf mDNS zu warten.

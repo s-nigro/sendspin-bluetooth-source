@@ -67,7 +67,8 @@ Music Assistant/Sendspin. Den Puffer stellst du in MA unter dem Plugin
    test“ auf YouTube).
 2. Hört man den Ton **nach** dem Bild: `delay_report_ms` erhöhen. Kommt er
    **vor** dem Bild: verringern. Schritte von 100 ms, danach feiner.
-3. Add-on neu starten. Der Beamer übernimmt den Wert beim nächsten Start der
+3. Am einfachsten in der Geräteverwaltung pro Gerät einstellen (ohne
+   Neustart). Der Beamer übernimmt den Wert spätestens beim nächsten Start der
    Wiedergabe.
 
 Ein guter Startwert ist `Target latency` + 200 ms. Erreicht das Bild nie den
@@ -89,12 +90,27 @@ zweiten günstigen USB-Dongle nur für dieses Add-on verwenden (`adapter`).
 Beachte: `device_name` setzt den Namen des gewählten Adapters. Teilst du den
 Adapter mit der Bridge, heißt er für alle Geräte so.
 
-## Gekoppeltes Gerät entfernen
+## Geräteverwaltung
 
-Beim Start listet das Add-on im Log alle gekoppelten Geräte mit MAC-Adresse auf.
-Zum Entfernen die MAC unter `remove_devices` eintragen und das Add-on neu
-starten. Danach die Liste wieder leeren. Auf dem Gerät selbst (iPhone, Beamer)
-„Camping Sound“ ebenfalls vergessen bzw. entkoppeln, dann neu koppeln.
+In der HA-Seitenleiste erscheint **Bluetooth-Quelle** (falls nicht: beim Add-on
+„In Seitenleiste anzeigen“ aktivieren). Dort geht alles ohne Neustart:
+
+- **Status:** Verbindung zu Music Assistant, Signal, gekoppelte Zuspieler mit
+  Codec.
+- **Kopplungsmodus** für 1, 3 oder 10 Minuten öffnen, z. B. zum Neukoppeln.
+  (Bei `discoverable_timeout: 0` ist das Gerät ohnehin immer sichtbar.)
+- **Verzögerung pro Gerät:** z. B. Beamer 1200 ms, Handy 800 ms. „Standard“
+  setzt auf `delay_report_ms` zurück. Der Wert wird sofort gemeldet; manche
+  Geräte übernehmen ihn erst beim nächsten Start der Wiedergabe.
+- **Trennen** und **Entfernen** (entkoppeln). Zum Neukoppeln danach den
+  Kopplungsmodus öffnen und am Gerät „Camping Sound“ vergessen und neu koppeln.
+- Unter *Andere Geräte an diesem Adapter* stehen z. B. Lautsprecher der
+  Bluetooth Bridge, wenn sie denselben Dongle nutzt. Die besser nicht entfernen.
+
+Die Seite ist nur über Home Assistant erreichbar, nicht direkt im Netzwerk.
+
+Alternativ ohne Oberfläche: MAC unter `remove_devices` eintragen und das
+Add-on neu starten (danach die Liste wieder leeren).
 
 ## Optionen
 
@@ -106,7 +122,7 @@ starten. Danach die Liste wieder leeren. Auf dem Gerät selbst (iPhone, Beamer)
 | `discoverable_timeout` | 0 | Minuten sichtbar nach Start, 0 = immer |
 | `allowed_devices` | [] | nur diese MACs dürfen koppeln/streamen |
 | `remove_devices` | [] | diese MACs beim Start entkoppeln (danach wieder leeren) |
-| `delay_report_ms` | 1000 | an den Beamer gemeldete Verzögerung |
+| `delay_report_ms` | 1000 | Standard-Verzögerung (pro Gerät in der Geräteverwaltung änderbar) |
 | `enable_aac` | true | AAC zusätzlich zu SBC anbieten |
 | `apply_remote_volume` | true | Lautstärketasten des Geräts übernehmen |
 | `silence_timeout` | 20 | Sekunden Stille bis „kein Signal“ |

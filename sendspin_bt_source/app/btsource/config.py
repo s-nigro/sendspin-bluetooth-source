@@ -31,6 +31,8 @@ class Options:
     server_url: str = ""
     listen_port: int = 8935
     set_device_class: bool = True
+    web_port: int = 8936
+    """Port of the device management page (HA ingress); 0 = off."""
     log_level: str = "info"
 
     @classmethod

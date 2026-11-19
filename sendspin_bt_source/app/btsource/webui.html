@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bluetooth-Quelle</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1c1f24; --muted: #646b75; --line: #e2e5ea;
+    --accent: #0b74d1; --accent-text: #ffffff; --ok: #1e8e3e; --warn: #b26a00; --danger: #c62828;
+    --chip: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111315; --card: #1c1f23; --text: #e8eaed; --muted: #9aa0a6; --line: #2e3238;
+      --accent: #4ea3f1; --accent-text: #0b1520; --ok: #5bc37a; --warn: #f0a742; --danger: #ef6b6b;
+      --chip: #272b30;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 4px 0 2px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 24px 4px 8px; font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+          margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .grow { flex: 1 1 auto; min-width: 0; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .mac { color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--chip); border-radius: 999px;
+          padding: 2px 10px; font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--text); padding: 6px 12px; cursor: pointer; min-height: 34px; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .5; cursor: default; }
+  .delay { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .delay input { width: 90px; font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
+                 background: var(--bg); color: var(--text); text-align: right; }
+  .stepper { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .empty { color: var(--muted); text-align: center; padding: 18px; }
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .status-grid .k { color: var(--muted); font-size: 13px; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s;
+           pointer-events: none; max-width: calc(100% - 32px); }
+  #toast.show { opacity: 1; }
+  details summary { cursor: pointer; color: var(--muted); margin: 18px 4px 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Bluetooth-Quelle</h1>
+  <p class="sub" id="subtitle">Lade …</p>
+
+  <div class="card">
+    <div class="status-grid">
+      <div><div class="k">Music Assistant</div><div id="ma">–</div></div>
+      <div><div class="k">Signal</div><div id="signal">–</div></div>
+      <div><div class="k">Standard-Verzögerung</div><div id="defdelay">–</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="grow">
+        <div class="name">Kopplungsmodus</div>
+        <div class="hint" id="pairing-text">–</div>
+      </div>
+      <div class="row" id="pairing-buttons"></div>
+    </div>
+  </div>
+
+  <h2>Zuspieler (Handy, Beamer, TV)</h2>
+  <div id="sources"></div>
+
+  <details id="others-box" hidden>
+    <summary>Andere Geräte an diesem Adapter</summary>
+    <p class="hint" style="margin:0 4px 8px">Meist Lautsprecher der Bluetooth Bridge, die denselben Dongle nutzt.
+      Entfernen trennt sie auch dort.</p>
+    <div id="others"></div>
+  </details>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let state = null;
+const dirty = new Set();   // MACs whose delay field the user is editing
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = await res.text();
+    try { msg = JSON.parse(msg).error || msg; } catch (_) {}
+    throw new Error(msg || res.statusText);
+  }
+  return res.json();
+}
+
+function fmtSecs(s) {
+  const m = Math.floor(s / 60), r = s % 60;
+  return m ? `${m}:${String(r).padStart(2, "0")} min` : `${r} s`;
+}
+
+// Replace markup only when it changed, so clicks are never lost to a re-render.
+function setHTML(el, html) {
+  if (el._html !== html) { el._html = html; el.innerHTML = html; }
+}
+
+function renderPairing(p) {
+  const text = $("pairing-text"), box = $("pairing-buttons");
+  if (p.always) {
+    text.textContent = "Immer sichtbar (Option discoverable_timeout = 0).";
+    setHTML(box, "");
+  } else if (p.open) {
+    text.textContent = p.remaining != null
+      ? `Sichtbar – neue Geräte können koppeln. Noch ${fmtSecs(p.remaining)}.`
+      : "Sichtbar – neue Geräte können koppeln.";
+    setHTML(box, `<button data-pair="0">Beenden</button>`);
+  } else {
+    text.textContent = "Aus. Gekoppelte Geräte verbinden sich weiterhin.";
+    setHTML(box, p.choices.map((s, i) =>
+      `<button ${i === 1 ? 'class="primary"' : ""} data-pair="${s}">${s / 60} min</button>`).join(""));
+  }
+}
+
+function deviceCard(d) {
+  const chips = [];
+  if (d.streaming) chips.push(`<span class="chip"><span class="dot ok"></span>Spielt · ${esc(d.codec)}</span>`);
+  else if (d.connected) chips.push(`<span class="chip"><span class="dot ok"></span>Verbunden</span>`);
+  else chips.push(`<span class="chip"><span class="dot"></span>Nicht verbunden</span>`);
+  if (d.paired) chips.push(`<span class="chip">Gekoppelt</span>`);
+  if (d.source && !d.trusted && d.paired) chips.push(`<span class="chip"><span class="dot warn"></span>Nicht vertraut</span>`);
+  const mac = esc(d.address);
+  const delay = d.source ? `
+    <div class="delay">
+      <span>Verzögerung</span>
+      <span class="stepper">
+        <button data-step="-100" data-mac="${mac}" aria-label="100 ms weniger">−100</button>
+        <input type="number" min="0" max="3000" step="10" value="${d.delay_ms}" data-delay="${mac}" aria-label="Verzögerung in ms">
+        <span>ms</span>
+        <button data-step="100" data-mac="${mac}" aria-label="100 ms mehr">+100</button>
+      </span>
+      <button class="primary" data-save="${mac}">Übernehmen</button>
+      ${d.custom_delay ? `<button data-reset="${mac}">Standard</button>` : `<span class="hint">Standard</span>`}
+    </div>` : "";
+  return `
+    <div class="card" data-card="${mac}">
+      <div class="row"><div class="grow">
+        <div class="name">${esc(d.name)}</div><div class="mac">${mac}</div>
+        <div class="chips">${chips.join("")}</div>
+      </div></div>
+      ${delay}
+      <div class="actions">
+        ${d.connected ? `<button data-disconnect="${mac}">Trennen</button>` : ""}
+        <button class="danger" data-remove="${mac}" data-name="${esc(d.name)}" data-source="${d.source ? 1 : 0}">Entfernen</button>
+      </div>
+    </div>`;
+}
+
+function render() {
+  if (!state) return;
+  $("title").textContent = state.name;
+  $("subtitle").textContent = `Adapter ${state.adapter} · ${state.adapter_address}`;
+  const ma = state.music_assistant;
+  setHTML($("ma"), ma.connected
+    ? `<span class="chip"><span class="dot ok"></span>${ma.streaming ? "Verbunden · überträgt" : "Verbunden"}</span>`
+    : `<span class="chip"><span class="dot warn"></span>Nicht verbunden</span>`);
+  setHTML($("signal"), ma.signal
+    ? `<span class="chip"><span class="dot ok"></span>Ton erkannt</span>`
+    : `<span class="chip"><span class="dot"></span>Kein Signal</span>`);
+  $("defdelay").textContent = `${state.default_delay_ms} ms`;
+  renderPairing(state.pairing);
+
+  // Keep fields the user is editing.
+  const editing = {};
+  document.querySelectorAll("input[data-delay]").forEach((el) => {
+    if (dirty.has(el.dataset.delay)) editing[el.dataset.delay] = el.value;
+  });
+  const focused = document.activeElement?.dataset?.delay;
+
+  const sources = state.devices.filter((d) => d.source);
+  const others = state.devices.filter((d) => !d.source);
+  setHTML($("sources"), sources.length ? sources.map(deviceCard).join("")
+    : `<div class="card empty">Noch kein Gerät. Kopplungsmodus öffnen und am Handy/Beamer „${esc(state.name)}“ wählen.</div>`);
+  setHTML($("others"), others.map(deviceCard).join(""));
+  $("others-box").hidden = others.length === 0;
+
+  for (const [mac, value] of Object.entries(editing)) {
+    const el = document.querySelector(`input[data-delay="${mac}"]`);
+    if (el) el.value = value;
+  }
+  if (focused) document.querySelector(`input[data-delay="${focused}"]`)?.focus();
+}
+
+async function refresh() {
+  try { state = await api("api/state"); render(); }
+  catch (e) { $("subtitle").textContent = "Keine Verbindung zum Add-on: " + e.message; }
+}
+
+async function act(fn, ok) {
+  try { await fn(); if (ok) toast(ok); } catch (e) { toast("Fehler: " + e.message); }
+  refresh();
+}
+
+document.addEventListener("input", (e) => {
+  if (e.target.dataset.delay) dirty.add(e.target.dataset.delay);
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.dataset.delay) {
+    document.querySelector(`button[data-save="${e.target.dataset.delay}"]`)?.click();
+  }
+});
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const d = b.dataset;
+  if (d.pair !== undefined) {
+    const secs = Number(d.pair);
+    act(() => api("api/pairing", {seconds: secs}), secs ? "Kopplungsmodus an" : "Kopplungsmodus aus");
+  } else if (d.step) {
+    const el = document.querySelector(`input[data-delay="${d.mac}"]`);
+    el.value = Math.max(0, Math.min(3000, (Number(el.value) || 0) + Number(d.step)));
+    dirty.add(d.mac);
+  } else if (d.save) {
+    const el = document.querySelector(`input[data-delay="${d.save}"]`);
+    const v = Math.round(Number(el.value));
+    if (!Number.isFinite(v) || v < 0 || v > 3000) { toast("Bitte 0–3000 ms eingeben"); return; }
+    dirty.delete(d.save);
+    act(() => api(`api/devices/${d.save}/delay`, {delay_ms: v}),
+        `Verzögerung ${v} ms gespeichert – wirkt spätestens beim nächsten Abspielen`);
+  } else if (d.reset) {
+    dirty.delete(d.reset);
+    act(() => api(`api/devices/${d.reset}/delay`, {delay_ms: null}), "Auf Standard zurückgesetzt");
+  } else if (d.disconnect) {
+    act(() => api(`api/devices/${d.disconnect}/disconnect`, {}), "Getrennt");
+  } else if (d.remove) {
+    const warn = d.source === "1" ? "" : "\n\nAchtung: Das ist vermutlich ein Lautsprecher der Bluetooth Bridge.";
+    if (!confirm(`„${d.name}“ entkoppeln?${warn}\n\nZum Neukoppeln danach den Kopplungsmodus öffnen und am Gerät „${state.name}“ vergessen/neu koppeln.`)) return;
+    act(() => api(`api/devices/${d.remove}/remove`, {}), "Entfernt");
+  }
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
