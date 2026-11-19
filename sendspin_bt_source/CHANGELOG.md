@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Geräteklasse direkt über die Bluetooth-Management-Schnittstelle setzen statt über btmgmt (das im Container hing). Die tatsächliche Klasse steht danach im Log.
+
 ## 0.2.0
 
 - Fix Ruckeln: Zeitstempel werden jetzt aus der Sampleanzahl gebildet statt aus der schwankenden Bluetooth-Ankunftszeit. Music Assistant hat bei jedem verspäteten Paket (> 15 ms) Stille eingefügt.

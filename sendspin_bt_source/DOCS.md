@@ -114,7 +114,7 @@ sich Fremde koppeln.
 ## Fehlersuche
 
 - **Beamer findet das Gerät nicht:** Ist `discoverable` aktiv? Im Log nach
-  „Geräteklasse“ schauen. Manche TVs zeigen nur Geräte mit Lautsprecher-Klasse
+  „Geräteklasse“ schauen (erwartet: „Audio/Video“). Manche TVs zeigen nur Geräte mit Lautsprecher-Klasse
   an.
 - **Gekoppelt, aber kein Ton:** Erscheint im Log `Verbunden: … AAC/SBC`? Wenn
   nicht, hat sich vermutlich das HA-Audiosystem den Ton geholt (es bietet

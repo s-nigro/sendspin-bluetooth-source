@@ -13,7 +13,6 @@ import asyncio
 import logging
 import os
 import re
-import shutil
 import time
 from dataclasses import dataclass, field
 
@@ -21,7 +20,7 @@ from dbus_fast import BusType, DBusError, Message, MessageType, Variant
 from dbus_fast.aio import MessageBus
 from dbus_fast.service import ServiceInterface, method
 
-from . import a2dp
+from . import a2dp, mgmt
 from .config import Options
 
 _LOGGER = logging.getLogger(__name__)
@@ -329,26 +328,20 @@ class BluezManager:
 
     async def _set_device_class(self) -> None:
         """Advertise as Audio/Video loudspeaker so TVs and projectors list it as a speaker."""
-        btmgmt = shutil.which("btmgmt")
-        if btmgmt is None:
-            _LOGGER.debug("btmgmt nicht verfügbar – Geräteklasse bleibt unverändert")
-            return
-        index = self.adapter_path.rsplit("hci", 1)[-1]
-        proc = await asyncio.create_subprocess_exec(
-            btmgmt, "--index", index, "class", "4", "20",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-        )
+        index = int(self.adapter_path.rsplit("hci", 1)[-1])
+        loop = asyncio.get_running_loop()
         try:
-            out, _ = await asyncio.wait_for(proc.communicate(), 5)
-        except TimeoutError:
-            proc.kill()
-            _LOGGER.warning("btmgmt hat nicht geantwortet – Geräteklasse nicht gesetzt")
+            await loop.run_in_executor(None, mgmt.set_device_class, index, 0x04, 0x14)
+        except OSError as err:
+            _LOGGER.warning("Geräteklasse konnte nicht gesetzt werden: %s", err)
+        try:
+            cls = await self.get_prop(self.adapter_path, IFACE_ADAPTER, "Class")
+        except DBusError:
             return
-        if proc.returncode == 0:
-            _LOGGER.info("Geräteklasse auf Audio/Lautsprecher gesetzt")
+        if (cls >> 8) & 0x1F == 0x04:
+            _LOGGER.info("Geräteklasse: Audio/Video (0x%06x)", cls)
         else:
-            _LOGGER.warning("Geräteklasse konnte nicht gesetzt werden: %s", out.decode(errors="replace").strip())
+            _LOGGER.info("Geräteklasse: 0x%06x (kein Audiogerät)", cls)
 
     async def _register_agent(self) -> None:
         await self._call("/org/bluez", IFACE_AGENT_MANAGER, "RegisterAgent", "os", [AGENT_PATH, "NoInputNoOutput"])
