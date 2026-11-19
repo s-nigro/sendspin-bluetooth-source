@@ -374,10 +374,14 @@ class BluezManager:
     async def stop(self) -> None:
         if self._discoverable_task:
             self._discoverable_task.cancel()
-        for t in list(self.transports.values()):
-            self._close_transport(t)
+        live = [t for t in self.transports.values() if t.fd is not None]
+        for t in live:
+            self._close_transport(t, release=False)
         if self.bus is None:
             return
+        # Release before disconnecting, otherwise the call dies with the bus.
+        for t in live:
+            await self._release(t)
         for path, _ep in self._endpoints:
             try:
                 await self._call(self.adapter_path, IFACE_MEDIA, "UnregisterEndpoint", "o", [path])
@@ -552,7 +556,7 @@ class BluezManager:
             info.stats["packets"] = info.stats.get("packets", 0) + 1
             self.listener.on_packet(info, data, time.monotonic_ns())
 
-    def _close_transport(self, info: TransportInfo) -> None:
+    def _close_transport(self, info: TransportInfo, *, release: bool = True) -> None:
         if info.fd is None:
             return
         fd, info.fd = info.fd, None
@@ -566,14 +570,14 @@ class BluezManager:
             pass
         _LOGGER.info("Wiedergabe von %s beendet", info.name or info.address)
         self.listener.on_stream_stopped(info)
-        if info.path in self.transports:
+        if release and info.path in self.transports:
             self._spawn(self._release(info))
 
     async def _release(self, info: TransportInfo) -> None:
         try:
             await self._call(info.path, IFACE_TRANSPORT, "Release")
-        except DBusError:
-            pass
+        except (DBusError, EOFError, OSError) as err:
+            _LOGGER.debug("Release %s: %r", info.path, err)
 
     def active_transport(self) -> TransportInfo | None:
         live = [t for t in self.transports.values() if t.fd is not None]

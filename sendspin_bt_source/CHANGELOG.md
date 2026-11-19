@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Kein Traceback mehr beim Stoppen/Neustarten während der Wiedergabe (Bluetooth-Verbindung wird vor dem Trennen von D-Bus freigegeben).
+
 ## 0.2.1
 
 - Geräteklasse direkt über die Bluetooth-Management-Schnittstelle setzen statt über btmgmt (das im Container hing). Die tatsächliche Klasse steht danach im Log.
