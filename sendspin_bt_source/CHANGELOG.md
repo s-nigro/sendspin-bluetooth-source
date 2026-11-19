@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- `server_url: auto`: Das Add-on verbindet sich selbst mit Music Assistant auf diesem Rechner (127.0.0.1, dann LAN-IP), statt auf mDNS zu warten.
+- Mit gesetzter `server_url` wird nicht mehr per mDNS angekündigt (Sendspin-Spezifikation).
+- Fix: falsche Meldung „nicht (mehr) gekoppelt“ direkt nach dem Entfernen.
+
 ## 0.3.0
 
 - Neue Option `remove_devices`: gekoppelte Bluetooth-Geräte beim Start entkoppeln.

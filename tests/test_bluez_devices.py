@@ -49,3 +49,15 @@ async def test_remove_listed_devices_only():
 def test_remove_devices_validation():
     with pytest.raises(ValueError):
         Options(remove_devices=["kein-mac"]).validate()
+
+
+def test_server_candidates():
+    from btsource.sendspin_link import server_candidates
+
+    assert server_candidates("") == []
+    assert server_candidates("ws://x:1/s") == ["ws://x:1/s"]
+    assert server_candidates("auto", "192.168.1.5") == [
+        "ws://127.0.0.1:8927/sendspin",
+        "ws://192.168.1.5:8927/sendspin",
+    ]
+    assert server_candidates("AUTO", None) == ["ws://127.0.0.1:8927/sendspin"]

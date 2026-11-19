@@ -34,7 +34,7 @@ configuration:
     description: pcm (geringste Latenz, Standard), flac oder opus.
   server_url:
     name: Music-Assistant-Adresse (optional)
-    description: z. B. ws://192.168.1.10:8927/sendspin – nur nötig, wenn MA das Add-on nicht per mDNS findet.
+    description: "auto = selbst mit Music Assistant auf diesem Rechner verbinden (empfohlen, wenn MA nicht von selbst verbindet). Oder eine URL wie ws://192.168.1.10:8927/sendspin. Leer = warten, bis MA das Add-on per mDNS findet."
   listen_port:
     name: Port
     description: Port, auf dem Music Assistant das Add-on erreicht.

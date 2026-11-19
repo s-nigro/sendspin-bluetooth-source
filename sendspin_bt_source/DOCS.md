@@ -111,7 +111,7 @@ starten. Danach die Liste wieder leeren. Auf dem Gerät selbst (iPhone, Beamer)
 | `apply_remote_volume` | true | Lautstärketasten des Geräts übernehmen |
 | `silence_timeout` | 20 | Sekunden Stille bis „kein Signal“ |
 | `stream_codec` | pcm | Codec zu MA (pcm/flac/opus) |
-| `server_url` | (leer) | MA direkt ansprechen, falls mDNS nicht klappt |
+| `server_url` | (leer) | `auto` = selbst mit MA auf diesem Rechner verbinden; oder eigene URL; leer = per mDNS warten |
 | `listen_port` | 8935 | Port für MA |
 | `set_device_class` | true | als Lautsprecher ausgeben |
 
@@ -130,5 +130,6 @@ sich Fremde koppeln.
   aktiviert lassen und neu koppeln.
 - **Ton stockt:** Zweiten Dongle verwenden, `Target latency` in MA erhöhen.
   Mit `log_level: debug` erscheinen verlorene Pakete im Log.
-- **MA findet das Add-on nicht:** `server_url` setzen, z. B.
-  `ws://<IP-von-HA>:8927/sendspin`.
+- **MA findet das Add-on nicht** (im Log fehlt „Mit Music Assistant verbunden“):
+  `server_url` auf `auto` setzen. Das Add-on verbindet sich dann selbst mit MA
+  auf diesem Rechner. Läuft MA woanders: `ws://<IP-von-MA>:8927/sendspin`.

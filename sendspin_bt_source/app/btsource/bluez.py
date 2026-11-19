@@ -300,6 +300,7 @@ class BluezManager:
             for path, ifaces in reply.body[0].items()
             if path.startswith(prefix) and IFACE_DEVICE in ifaces
         }
+        removed: set[str] = set()
         for path, props in list(devices.items()):
             address = props.get("Address", address_from_path(path))
             if address.upper() not in self.options.remove_devices:
@@ -309,10 +310,11 @@ class BluezManager:
                 _LOGGER.info("Gerät %s (%s) entfernt – kann jetzt neu gekoppelt werden",
                              address, props.get("Alias", "?"))
                 del devices[path]
+                removed.add(address.upper())
             except DBusError as err:
                 _LOGGER.warning("Gerät %s konnte nicht entfernt werden: %s", address, err)
         for mac in self.options.remove_devices:
-            if not any(p.get("Address", "").upper() == mac for p in devices.values()):
+            if mac not in removed and not any(p.get("Address", "").upper() == mac for p in devices.values()):
                 _LOGGER.info("Zu entfernendes Gerät %s ist nicht (mehr) gekoppelt", mac)
         paired = [p for p in devices.values() if p.get("Paired")]
         if paired:

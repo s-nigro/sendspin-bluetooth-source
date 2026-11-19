@@ -7,6 +7,7 @@ import contextlib
 import json
 import logging
 import os
+import socket
 import stat
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -26,6 +27,31 @@ from .config import Options
 from .timing import CaptureClock
 
 _LOGGER = logging.getLogger(__name__)
+
+MA_SENDSPIN_PORT = 8927
+MA_SENDSPIN_PATH = "/sendspin"
+
+
+def _lan_ip() -> str | None:
+    """Primary IPv4 address of this host (no packet is sent)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))  # TEST-NET-1, routing lookup only
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
+def server_candidates(server_url: str, lan_ip: str | None = None) -> list[str]:
+    """URLs to connect to: the configured one, or for 'auto' Music Assistant on this host."""
+    if not server_url:
+        return []
+    if server_url.lower() != "auto":
+        return [server_url]
+    urls = [f"ws://127.0.0.1:{MA_SENDSPIN_PORT}{MA_SENDSPIN_PATH}"]
+    if lan_ip and lan_ip != "127.0.0.1":
+        urls.append(f"ws://{lan_ip}:{MA_SENDSPIN_PORT}{MA_SENDSPIN_PATH}")
+    return urls
 
 PairingCodeHook = Callable[[str | None, str | None], Awaitable[None]]
 
@@ -108,12 +134,16 @@ class SendspinLink:
             on_connection=self._handle_server_connection,
             port=self.options.listen_port,
             client_name=self.options.device_name,
-            advertise_mdns=self._advertise_mdns,
+            # Sendspin spec: a client that dials the server itself must not also advertise.
+            advertise_mdns=self._advertise_mdns and not self.options.server_url,
         )
         await self._listener.start()
-        _LOGGER.info("Warte auf Music Assistant (mDNS _sendspin._tcp, Port %d)", self.options.listen_port)
-        if self.options.server_url:
-            self._tasks.append(asyncio.create_task(self._connect_loop(self.options.server_url)))
+        urls = server_candidates(self.options.server_url, _lan_ip())
+        if urls:
+            _LOGGER.info("Verbinde mich selbst mit Music Assistant: %s", ", ".join(urls))
+            self._tasks.append(asyncio.create_task(self._connect_loop(urls)))
+        else:
+            _LOGGER.info("Warte auf Music Assistant (mDNS _sendspin._tcp, Port %d)", self.options.listen_port)
         self._tasks.append(asyncio.create_task(self._reconcile_loop()))
 
     async def stop(self) -> None:
@@ -137,24 +167,29 @@ class SendspinLink:
         except Exception:  # noqa: BLE001 - keep listener alive
             _LOGGER.exception("Fehler in der Sendspin-Verbindung")
 
-    async def _connect_loop(self, url: str) -> None:
+    async def _connect_loop(self, urls: list[str]) -> None:
         assert self.client is not None
         backoff = 2.0
+        warned: set[str] = set()
         while True:
-            try:
-                if not self.client.connected:
-                    await self.client.connect(url)
-                    _LOGGER.info("Mit %s verbunden", url)
-                    backoff = 2.0
-                done = asyncio.Event()
-                unsub = self.client.add_disconnect_listener(done.set)
-                if self.client.connected:
-                    await done.wait()
-                unsub()
-            except (TimeoutError, OSError, ClientError, RuntimeError, HandshakeAbortedError) as err:
-                _LOGGER.warning("Verbindung zu %s fehlgeschlagen: %s (neuer Versuch in %.0f s)", url, err, backoff)
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 120.0)
+            for url in urls:
+                try:
+                    if not self.client.connected:
+                        await self.client.connect(url)
+                        _LOGGER.info("Mit %s verbunden", url)
+                        backoff = 2.0
+                        warned.clear()
+                    done = asyncio.Event()
+                    unsub = self.client.add_disconnect_listener(done.set)
+                    if self.client.connected:
+                        await done.wait()
+                    unsub()
+                except (TimeoutError, OSError, ClientError, RuntimeError, HandshakeAbortedError) as err:
+                    level = logging.DEBUG if url in warned else logging.WARNING
+                    _LOGGER.log(level, "Verbindung zu %s fehlgeschlagen: %s", url, err)
+                    warned.add(url)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60.0)
 
     # -- pairing ----------------------------------------------------------------------
 
