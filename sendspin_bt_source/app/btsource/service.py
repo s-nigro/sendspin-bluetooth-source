@@ -8,7 +8,7 @@ import logging
 import time
 from pathlib import Path
 
-from . import a2dp
+from . import a2dp, ha
 from .bluez import BluezManager, StreamListener, TransportInfo
 from .config import Options
 from .devices import DeviceStore
@@ -123,7 +123,11 @@ class Service:
         await self.link.start()
         self.pipeline.start()
         self.bluez = BluezManager(self.options, self.pipeline, self.store)
+        if self.options.restart_audio_on_start:
+            self.bluez.on_registered = ha.restart_audio
         await self.bluez.start()
+        if self.options.restart_audio_on_start:
+            self._audio_task = asyncio.create_task(ha.restart_audio())
         if self.options.web_port:
             self.webui = WebUI(self.bluez, self.link, self.options.web_port)
             try:

@@ -146,6 +146,12 @@ sich Fremde koppeln.
   („Ton von … geht an einen anderen Bluetooth-Empfänger“) und übernimmt den
   Stream automatisch; in der Geräteverwaltung geht es auch per „Ton
   übernehmen“. Klappt das nicht: Gerät entfernen und neu koppeln.
+- **Beamer/TV verbunden, aber Ton geht nicht ans Add-on:** Geräte, die nur SBC
+  können, nehmen den ersten passenden Empfänger, und das HA-Audiosystem
+  (PulseAudio, von der Bluetooth Bridge genutzt) bietet auf allen Adaptern
+  selbst einen an. Mit `restart_audio_on_start` (Standard) startet das Add-on
+  das Audiosystem nach sich selbst neu, damit sein Empfänger vorne steht.
+  Welche Codecs ein Gerät kann, zeigt die Geräteverwaltung („Kann senden“).
 - **Adapter wechselt nach Neustart:** Die Nummern `hci0`/`hci1` können sich
   vertauschen. Unter `adapter` besser die MAC-Adresse des Dongles eintragen.
 - **Ton stockt:** Zweiten Dongle verwenden, `Target latency` in MA erhöhen.

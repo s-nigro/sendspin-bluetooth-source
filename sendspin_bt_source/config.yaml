@@ -1,5 +1,5 @@
 name: Sendspin Bluetooth Source
-version: "0.6.3"
+version: "0.7.0"
 slug: sendspin_bt_source
 description: >-
   Bluetooth-Lautsprecher für Beamer, TV und Handy: Ton per Bluetooth empfangen
@@ -14,6 +14,8 @@ init: false
 host_network: true
 host_dbus: true
 homeassistant_api: true
+hassio_api: true
+hassio_role: manager
 ingress: true
 ingress_port: 8936
 panel_icon: mdi:bluetooth-audio
@@ -32,6 +34,7 @@ options:
   delay_report_ms: 1000
   enable_aac: true
   claim_streams: true
+  restart_audio_on_start: true
   apply_remote_volume: true
   silence_timeout: 20
   stream_codec: pcm
@@ -51,6 +54,7 @@ schema:
   delay_report_ms: int(0,3000)
   enable_aac: bool
   claim_streams: bool
+  restart_audio_on_start: bool
   apply_remote_volume: bool
   silence_timeout: int(0,600)
   stream_codec: list(pcm|flac|opus)

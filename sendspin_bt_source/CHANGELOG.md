@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Neue Option `restart_audio_on_start` (Standard an): Nach dem Anmelden der
+  eigenen Empfänger startet das Add-on das HA-Audiosystem neu
+  (wie `ha audio restart`). Dann landen Geräte, die nur SBC können (z. B. der
+  Beamer), beim Add-on statt beim Bluetooth-Empfänger von PulseAudio. Auch nach
+  einem Neustart von bluetoothd. Boxen der Bluetooth Bridge verbinden sich dabei
+  kurz neu. Braucht `hassio_role: manager`.
+- Geräteverwaltung und Log zeigen die vom Gerät gemeldete Lautstärke.
+
 ## 0.6.3
 
 - Zeigt an, welche Codecs ein Zuspieler senden kann (Log „Codecs von …“ und Geräteverwaltung „Kann senden: …“).

@@ -25,6 +25,8 @@ class Options:
     """Delay reported to the sending device so it can hold back the picture."""
     enable_aac: bool = True
     claim_streams: bool = True
+    restart_audio_on_start: bool = True
+    """Restart HA audio after registering so our sink is listed before PulseAudio's."""
     """Take over A2DP streams that BlueZ handed to another sink (e.g. HA audio)."""
     apply_remote_volume: bool = True
     silence_timeout: int = 20

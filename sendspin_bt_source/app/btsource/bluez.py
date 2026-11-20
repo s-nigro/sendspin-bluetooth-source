@@ -207,6 +207,8 @@ class BluezManager:
         self.foreign: dict[str, tuple[str, str]] = {}  # transport path -> (address, endpoint)
         self._claims: dict[str, list[float]] = {}
         self.sender_codecs: dict[str, list[str]] = {}  # address -> codecs the sender offers
+        # Called after our endpoints are (re-)registered with BlueZ.
+        self.on_registered = None
 
     # -- helpers --------------------------------------------------------------
 
@@ -285,6 +287,9 @@ class BluezManager:
             await self._register_with_bluez()
         except (DBusError, RuntimeError) as err:
             _LOGGER.error("Erneute Registrierung fehlgeschlagen: %s", err)
+            return
+        if self.on_registered is not None:
+            await self.on_registered()
 
     async def _add_match(self, rule: str) -> None:
         assert self.bus is not None
@@ -517,6 +522,7 @@ class BluezManager:
                 "source": a2dp.A2DP_SOURCE_UUID in uuids or self.store.known(address) or bool(live),
                 "streaming": any(t.fd is not None for t in live),
                 "codec": live[-1].config.description if live else None,
+                "volume": live[-1].volume if live else None,
                 "delay_ms": self.store.delay_for(address),
                 "custom_delay": self.store.custom_delay(address) is not None,
                 "foreign": next((what for a, what in self.foreign.values() if a == address), None),
@@ -669,6 +675,7 @@ class BluezManager:
     def _on_transport_changed(self, info: TransportInfo, changed: dict) -> None:
         if "Volume" in changed:
             info.volume = int(changed["Volume"])
+            _LOGGER.info("Lautstärke von %s: %d %%", info.name or info.address, round(info.volume * 100 / 127))
             self.listener.on_volume(info, info.volume)
         if "State" in changed:
             old, info.state = info.state, changed["State"]

@@ -26,6 +26,9 @@ configuration:
   claim_streams:
     name: Ton von anderen Empfängern übernehmen
     description: Schickt ein Gerät seinen Ton an einen anderen Bluetooth-Empfänger auf diesem Rechner (z. B. das HA-Audiosystem), holt das Add-on den Stream zu sich.
+  restart_audio_on_start:
+    name: HA-Audiosystem beim Start neu starten
+    description: Damit Beamer/TV, die nur SBC können, bei diesem Add-on landen statt beim Bluetooth-Empfänger des HA-Audiosystems. Boxen der Bluetooth Bridge verbinden sich dabei kurz neu.
   apply_remote_volume:
     name: Lautstärke vom Gerät übernehmen
     description: Lautstärketasten von Beamer/Handy regeln den Pegel des Live Inputs.

@@ -148,6 +148,7 @@ function deviceCard(d) {
   if (d.streaming) chips.push(`<span class="chip"><span class="dot ok"></span>Spielt · ${esc(d.codec)}</span>`);
   else if (d.connected) chips.push(`<span class="chip"><span class="dot ok"></span>Verbunden</span>`);
   else chips.push(`<span class="chip"><span class="dot"></span>Nicht verbunden</span>`);
+  if (d.volume != null) chips.push(`<span class="chip">Lautstärke ${Math.round(d.volume * 100 / 127)} %</span>`);
   if (d.foreign) chips.push(`<span class="chip"><span class="dot warn"></span>Ton geht an ${esc(d.foreign)}</span>`);
   if (d.paired) chips.push(`<span class="chip">Gekoppelt</span>`);
   if (d.source && !d.trusted && d.paired) chips.push(`<span class="chip"><span class="dot warn"></span>Nicht vertraut</span>`);

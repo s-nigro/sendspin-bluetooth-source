@@ -212,3 +212,29 @@ async def test_own_transport_is_not_foreign(manager, monkeypatch):
     manager.transports[own] = bluez.TransportInfo(own, BEAMER_PATH, BEAMER, cfg)
     await manager._check_transport(own, {"Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID})
     assert not manager.foreign
+
+
+@pytest.mark.asyncio
+async def test_restart_audio_needs_supervisor(monkeypatch):
+    from btsource import ha
+
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
+    assert await ha.restart_audio() is False
+
+
+@pytest.mark.asyncio
+async def test_on_registered_runs_after_bluez_restart(manager, monkeypatch):
+    called = []
+
+    async def hook():
+        called.append(True)
+
+    async def noop():
+        return None
+
+    for name in ("_find_adapter", "_configure_adapter", "_register_with_bluez"):
+        monkeypatch.setattr(manager, name, noop)
+    monkeypatch.setattr(bluez.asyncio, "sleep", lambda s: noop())
+    manager.on_registered = hook
+    await manager._on_bluez_restart()
+    assert called == [True]
