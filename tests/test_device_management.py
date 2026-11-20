@@ -136,3 +136,52 @@ async def test_web_rejects_lan_clients(manager):
     ui = WebUI(manager, FakeLink(), 0)  # only the ingress proxy is allowed
     async with TestClient(TestServer(ui.app)) as client:
         assert (await client.get("/api/state")).status == 403
+
+
+BEAMER = "84:93:EC:6A:5F:F9"
+BEAMER_PATH = ADAPTER + "/dev_84_93_EC_6A_5F_F9"
+
+
+@pytest.mark.asyncio
+async def test_foreign_stream_is_detected_and_claimed(manager):
+    sbc_caps = bytes([0xFF, 0xFF, 2, 53])
+    objects = _objects()
+    objects[BEAMER_PATH] = {bluez.IFACE_DEVICE: {
+        "Address": Variant("s", BEAMER), "Alias": Variant("s", "Indoor"),
+        "Paired": Variant("b", True), "Connected": Variant("b", True),
+        "UUIDs": Variant("as", [a2dp.A2DP_SOURCE_UUID]),
+    }}
+    objects[BEAMER_PATH + "/sep1"] = {bluez.IFACE_ENDPOINT: {
+        "UUID": Variant("s", a2dp.A2DP_SOURCE_UUID), "Codec": Variant("y", a2dp.CODEC_SBC),
+        "Capabilities": Variant("ay", sbc_caps),
+    }}
+    manager._endpoints = manager._make_endpoints()
+    calls = []
+
+    async def fake_call(path, iface, member, signature="", body=None):
+        calls.append((path, iface, member, body))
+        if member == "GetManagedObjects":
+            return SimpleNamespace(body=[objects])
+        return SimpleNamespace(body=[], unix_fds=[])
+
+    manager._call = fake_call
+    # The bridge's own outgoing stream to the speaker must be left alone.
+    await manager._check_transport(SPEAKER_PATH + "/fd0", {
+        "Device": SPEAKER_PATH, "UUID": a2dp.A2DP_SOURCE_UUID, "Endpoint": "/MediaEndpoint/A2DPSource/sbc"})
+    assert not manager.foreign
+    # Google TV handed to the HA audio sink -> detected and claimed with our SBC endpoint.
+    await manager._check_transport(BEAMER_PATH + "/fd1", {
+        "Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID, "Endpoint": "/MediaEndpoint/A2DPSink/sbc"})
+    assert manager.foreign[BEAMER_PATH + "/fd1"][0] == BEAMER
+    claim = [c for c in calls if c[2] == "SetConfiguration"]
+    assert len(claim) == 1
+    sep, iface, _, (local, props) = claim[0]
+    assert sep == BEAMER_PATH + "/sep1" and iface == bluez.IFACE_ENDPOINT
+    assert local.endswith("/sbc")
+    a2dp.parse_sbc_config(bytes(props["Capabilities"].value))  # a valid configuration
+    devices = {d["address"]: d for d in await manager.list_devices()}
+    assert devices[BEAMER]["foreign"] == "HA-Audiosystem"
+    # Our own transport is not foreign.
+    await manager._check_transport(BEAMER_PATH + "/fd2", {
+        "Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID, "Endpoint": bluez.ENDPOINT_BASE + "/sbc"})
+    assert BEAMER_PATH + "/fd2" not in manager.foreign

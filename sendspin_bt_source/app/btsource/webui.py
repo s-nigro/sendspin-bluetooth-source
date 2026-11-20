@@ -40,6 +40,7 @@ class WebUI:
             web.post("/api/devices/{mac}/remove", self._remove),
             web.post("/api/devices/{mac}/disconnect", self._disconnect),
             web.post("/api/devices/{mac}/delay", self._delay),
+            web.post("/api/devices/{mac}/claim", self._claim),
         ])
 
     async def start(self) -> None:
@@ -112,6 +113,12 @@ class WebUI:
             await self.bluez.disconnect_device(_mac(request))
         except KeyError:
             raise web.HTTPNotFound(text="Gerät unbekannt") from None
+        return web.json_response({"ok": True})
+
+    async def _claim(self, request: web.Request) -> web.Response:
+        ok = await self.bluez.claim_device(_mac(request))
+        if not ok:
+            return web.json_response({"error": "Übernahme fehlgeschlagen – Details im Add-on-Log"}, status=409)
         return web.json_response({"ok": True})
 
     async def _delay(self, request: web.Request) -> web.Response:

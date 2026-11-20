@@ -24,6 +24,8 @@ class Options:
     delay_report_ms: int = 1000
     """Delay reported to the sending device so it can hold back the picture."""
     enable_aac: bool = True
+    claim_streams: bool = True
+    """Take over A2DP streams that BlueZ handed to another sink (e.g. HA audio)."""
     apply_remote_volume: bool = True
     silence_timeout: int = 20
     """Seconds of silence after which the input reports 'no signal' (0 = never)."""

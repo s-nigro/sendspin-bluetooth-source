@@ -23,6 +23,9 @@ configuration:
   enable_aac:
     name: AAC anbieten
     description: Bessere Qualität; Android/Google TV bevorzugt AAC. SBC steht immer zur Verfügung.
+  claim_streams:
+    name: Ton von anderen Empfängern übernehmen
+    description: Schickt ein Gerät seinen Ton an einen anderen Bluetooth-Empfänger auf diesem Rechner (z. B. das HA-Audiosystem), holt das Add-on den Stream zu sich.
   apply_remote_volume:
     name: Lautstärke vom Gerät übernehmen
     description: Lautstärketasten von Beamer/Handy regeln den Pegel des Live Inputs.

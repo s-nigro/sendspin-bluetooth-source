@@ -23,6 +23,9 @@ configuration:
   enable_aac:
     name: Offer AAC
     description: Better quality; Android/Google TV prefers AAC. SBC is always available.
+  claim_streams:
+    name: Take over streams from other receivers
+    description: If a device sends its audio to another Bluetooth receiver on this host (e.g. the HA audio system), the add-on takes the stream over.
   apply_remote_volume:
     name: Follow device volume
     description: Volume keys on the projector/phone control the Live Input level.

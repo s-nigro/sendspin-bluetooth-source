@@ -148,6 +148,7 @@ function deviceCard(d) {
   if (d.streaming) chips.push(`<span class="chip"><span class="dot ok"></span>Spielt · ${esc(d.codec)}</span>`);
   else if (d.connected) chips.push(`<span class="chip"><span class="dot ok"></span>Verbunden</span>`);
   else chips.push(`<span class="chip"><span class="dot"></span>Nicht verbunden</span>`);
+  if (d.foreign) chips.push(`<span class="chip"><span class="dot warn"></span>Ton geht an ${esc(d.foreign)}</span>`);
   if (d.paired) chips.push(`<span class="chip">Gekoppelt</span>`);
   if (d.source && !d.trusted && d.paired) chips.push(`<span class="chip"><span class="dot warn"></span>Nicht vertraut</span>`);
   const mac = esc(d.address);
@@ -171,6 +172,7 @@ function deviceCard(d) {
       </div></div>
       ${delay}
       <div class="actions">
+        ${d.foreign ? `<button class="primary" data-claim="${mac}">Ton übernehmen</button>` : ""}
         ${d.connected ? `<button data-disconnect="${mac}">Trennen</button>` : ""}
         <button class="danger" data-remove="${mac}" data-name="${esc(d.name)}" data-source="${d.source ? 1 : 0}">Entfernen</button>
       </div>
@@ -253,6 +255,8 @@ document.addEventListener("click", (e) => {
   } else if (d.reset) {
     dirty.delete(d.reset);
     act(() => api(`api/devices/${d.reset}/delay`, {delay_ms: null}), "Auf Standard zurückgesetzt");
+  } else if (d.claim) {
+    act(() => api(`api/devices/${d.claim}/claim`, {}), "Ton übernommen");
   } else if (d.disconnect) {
     act(() => api(`api/devices/${d.disconnect}/disconnect`, {}), "Getrennt");
   } else if (d.remove) {

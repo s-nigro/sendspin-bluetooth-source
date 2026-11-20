@@ -1,5 +1,5 @@
 name: Sendspin Bluetooth Source
-version: "0.5.0"
+version: "0.6.0"
 slug: sendspin_bt_source
 description: >-
   Bluetooth-Lautsprecher für Beamer, TV und Handy: Ton per Bluetooth empfangen
@@ -31,6 +31,7 @@ options:
   remove_devices: []
   delay_report_ms: 1000
   enable_aac: true
+  claim_streams: true
   apply_remote_volume: true
   silence_timeout: 20
   stream_codec: pcm
@@ -49,6 +50,7 @@ schema:
     - str
   delay_report_ms: int(0,3000)
   enable_aac: bool
+  claim_streams: bool
   apply_remote_volume: bool
   silence_timeout: int(0,600)
   stream_codec: list(pcm|flac|opus)

@@ -142,8 +142,12 @@ sich Fremde koppeln.
   an.
 - **Gekoppelt, aber kein Ton:** Erscheint im Log `Verbunden: … AAC/SBC`? Wenn
   nicht, hat sich vermutlich das HA-Audiosystem den Ton geholt (es bietet
-  ebenfalls einen Bluetooth-Empfänger an). Gerät entkoppeln, `enable_aac`
-  aktiviert lassen und neu koppeln.
+  ebenfalls einen Bluetooth-Empfänger an). Das Add-on erkennt das
+  („Ton von … geht an einen anderen Bluetooth-Empfänger“) und übernimmt den
+  Stream automatisch; in der Geräteverwaltung geht es auch per „Ton
+  übernehmen“. Klappt das nicht: Gerät entfernen und neu koppeln.
+- **Adapter wechselt nach Neustart:** Die Nummern `hci0`/`hci1` können sich
+  vertauschen. Unter `adapter` besser die MAC-Adresse des Dongles eintragen.
 - **Ton stockt:** Zweiten Dongle verwenden, `Target latency` in MA erhöhen.
   Mit `log_level: debug` erscheinen verlorene Pakete im Log.
 - **MA findet das Add-on nicht** (im Log fehlt „Mit Music Assistant verbunden“):

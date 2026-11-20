@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Erkennt, wenn ein Zuspieler (z. B. Google TV) seinen Ton an einen anderen
+  Bluetooth-Empfänger auf dem HA-Rechner schickt (meist das HA-Audiosystem),
+  und übernimmt den Stream automatisch (Option `claim_streams`).
+- Geräteverwaltung zeigt das an und hat die Schaltfläche „Ton übernehmen“.
+
 ## 0.5.0
 
 - Neue Geräteverwaltung in der HA-Seitenleiste („Bluetooth-Quelle“):
