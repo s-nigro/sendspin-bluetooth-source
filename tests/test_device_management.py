@@ -142,10 +142,7 @@ BEAMER = "84:93:EC:6A:5F:F9"
 BEAMER_PATH = ADAPTER + "/dev_84_93_EC_6A_5F_F9"
 
 
-@pytest.mark.asyncio
-async def test_foreign_stream_is_detected_and_claimed(manager):
-    sbc_caps = bytes([0xFF, 0xFF, 2, 53])
-    objects = _objects()
+def _with_beamer(objects, *, transports=()):
     objects[BEAMER_PATH] = {bluez.IFACE_DEVICE: {
         "Address": Variant("s", BEAMER), "Alias": Variant("s", "Indoor"),
         "Paired": Variant("b", True), "Connected": Variant("b", True),
@@ -153,8 +150,20 @@ async def test_foreign_stream_is_detected_and_claimed(manager):
     }}
     objects[BEAMER_PATH + "/sep1"] = {bluez.IFACE_ENDPOINT: {
         "UUID": Variant("s", a2dp.A2DP_SOURCE_UUID), "Codec": Variant("y", a2dp.CODEC_SBC),
-        "Capabilities": Variant("ay", sbc_caps),
+        "Capabilities": Variant("ay", bytes([0xFF, 0xFF, 2, 53])),
     }}
+    for t in transports:
+        objects[t] = {bluez.IFACE_TRANSPORT: {}}
+    return objects
+
+
+@pytest.mark.asyncio
+async def test_foreign_stream_taken_over_after_disconnect(manager, monkeypatch):
+    from dbus_fast import DBusError
+
+    monkeypatch.setattr(bluez, "FOREIGN_GRACE_S", 0)
+    foreign_t = BEAMER_PATH + "/sep1/fd1"
+    objects = _with_beamer(_objects(), transports=[foreign_t, SPEAKER_PATH + "/fd0"])
     manager._endpoints = manager._make_endpoints()
     calls = []
 
@@ -162,26 +171,41 @@ async def test_foreign_stream_is_detected_and_claimed(manager):
         calls.append((path, iface, member, body))
         if member == "GetManagedObjects":
             return SimpleNamespace(body=[objects])
+        if member == "SetConfiguration" and foreign_t in objects:
+            raise DBusError("org.bluez.Error.Failed", "Operation not permitted")
+        if member == "DisconnectProfile":
+            objects.pop(foreign_t)
+            manager.foreign.pop(foreign_t, None)  # what InterfacesRemoved does
         return SimpleNamespace(body=[], unix_fds=[])
 
     manager._call = fake_call
-    # The bridge's own outgoing stream to the speaker must be left alone.
-    await manager._check_transport(SPEAKER_PATH + "/fd0", {
-        "Device": SPEAKER_PATH, "UUID": a2dp.A2DP_SOURCE_UUID, "Endpoint": "/MediaEndpoint/A2DPSource/sbc"})
+    # The bridge's own outgoing stream to the speaker is left alone.
+    await manager._check_transport(SPEAKER_PATH + "/fd0", {"Device": SPEAKER_PATH, "UUID": a2dp.A2DP_SOURCE_UUID})
+    assert not manager.foreign and not [c for c in calls if c[2] == "SetConfiguration"]
+
+    await manager._check_transport(foreign_t, {"Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID})
+    members = [c[2] for c in calls if c[2] in ("SetConfiguration", "DisconnectProfile")]
+    assert members == ["SetConfiguration", "DisconnectProfile", "SetConfiguration"]
+    sep, iface, _, (local, props) = [c for c in calls if c[2] == "SetConfiguration"][-1]
+    assert sep == BEAMER_PATH + "/sep1" and iface == bluez.IFACE_ENDPOINT and local.endswith("/sbc")
+    a2dp.parse_sbc_config(bytes(props["Capabilities"].value))
+    disconnect = [c for c in calls if c[2] == "DisconnectProfile"][0]
+    assert disconnect[0] == BEAMER_PATH and disconnect[3] == [a2dp.A2DP_SOURCE_UUID]
+
+
+@pytest.mark.asyncio
+async def test_own_transport_is_not_foreign(manager, monkeypatch):
+    monkeypatch.setattr(bluez, "FOREIGN_GRACE_S", 0)
+    own = BEAMER_PATH + "/sep1/fd2"
+    objects = _with_beamer(_objects(), transports=[own])
+
+    async def fake_call(path, iface, member, signature="", body=None):
+        if member == "GetManagedObjects":
+            return SimpleNamespace(body=[objects])
+        return SimpleNamespace(body=[], unix_fds=[])
+
+    manager._call = fake_call
+    cfg = a2dp.parse_sbc_config(bytes([0x11, 0x15, 2, 53]))
+    manager.transports[own] = bluez.TransportInfo(own, BEAMER_PATH, BEAMER, cfg)
+    await manager._check_transport(own, {"Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID})
     assert not manager.foreign
-    # Google TV handed to the HA audio sink -> detected and claimed with our SBC endpoint.
-    await manager._check_transport(BEAMER_PATH + "/fd1", {
-        "Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID, "Endpoint": "/MediaEndpoint/A2DPSink/sbc"})
-    assert manager.foreign[BEAMER_PATH + "/fd1"][0] == BEAMER
-    claim = [c for c in calls if c[2] == "SetConfiguration"]
-    assert len(claim) == 1
-    sep, iface, _, (local, props) = claim[0]
-    assert sep == BEAMER_PATH + "/sep1" and iface == bluez.IFACE_ENDPOINT
-    assert local.endswith("/sbc")
-    a2dp.parse_sbc_config(bytes(props["Capabilities"].value))  # a valid configuration
-    devices = {d["address"]: d for d in await manager.list_devices()}
-    assert devices[BEAMER]["foreign"] == "HA-Audiosystem"
-    # Our own transport is not foreign.
-    await manager._check_transport(BEAMER_PATH + "/fd2", {
-        "Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID, "Endpoint": bluez.ENDPOINT_BASE + "/sbc"})
-    assert BEAMER_PATH + "/fd2" not in manager.foreign

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1
+
+- Übernahme klappt jetzt auch, wenn BlueZ das direkte Umkonfigurieren verweigert
+  („Operation not permitted“): Die Musikverbindung des Geräts wird kurz getrennt
+  und vom Add-on selbst neu eingerichtet.
+- Fremde Streams werden daran erkannt, dass das Add-on sie nicht bekommen hat
+  (die Eigenschaft `Endpoint` nennt den Endpunkt des Geräts, nicht den Empfänger).
+
 ## 0.6.0
 
 - Erkennt, wenn ein Zuspieler (z. B. Google TV) seinen Ton an einen anderen

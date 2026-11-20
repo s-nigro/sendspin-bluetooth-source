@@ -37,6 +37,7 @@ IFACE_PROPS = "org.freedesktop.DBus.Properties"
 IFACE_OM = "org.freedesktop.DBus.ObjectManager"
 
 AGENT_PATH = "/io/sendspin/btsource/agent"
+FOREIGN_GRACE_S = 1.5
 ENDPOINT_BASE = "/io/sendspin/btsource/endpoint"
 
 AUDIO_UUIDS = {
@@ -55,12 +56,6 @@ _DEV_RE = re.compile(r"/dev_([0-9A-F]{2}(?:_[0-9A-F]{2}){5})")
 def address_from_path(path: str) -> str:
     m = _DEV_RE.search(path)
     return m.group(1).replace("_", ":") if m else "?"
-
-
-def describe_endpoint(path: str) -> str:
-    if path.startswith("/MediaEndpoint"):
-        return "HA-Audiosystem"
-    return path or "unbekannt"
 
 
 def unwrap(props: dict) -> dict:
@@ -504,7 +499,7 @@ class BluezManager:
                 "codec": live[-1].config.description if live else None,
                 "delay_ms": self.store.delay_for(address),
                 "custom_delay": self.store.custom_delay(address) is not None,
-                "foreign": next((describe_endpoint(ep) for a, ep in self.foreign.values() if a == address), None),
+                "foreign": next((what for a, what in self.foreign.values() if a == address), None),
             })
         out.sort(key=lambda d: (not d["source"], d["name"].lower()))
         return out
@@ -671,34 +666,43 @@ class BluezManager:
                 await self._check_transport(path, unwrap(ifaces[IFACE_TRANSPORT]))
 
     async def _check_transport(self, path: str, props: dict) -> None:
-        """Spot a sender whose audio BlueZ gave to another A2DP sink, and take it over."""
+        """Spot a sender whose audio BlueZ gave to another A2DP sink, and take it over.
+
+        The transport's ``Endpoint`` property names the *remote* SEP, so ownership is
+        decided by whether our endpoint got a SetConfiguration for it.
+        """
         device = str(props.get("Device", ""))
         if not device.startswith(self.adapter_path + "/"):
             return
         if str(props.get("UUID", "")).lower() != a2dp.A2DP_SINK_UUID:
             return  # e.g. the BT bridge streaming to its speakers
-        endpoint = str(props.get("Endpoint", ""))
-        if not endpoint:
-            await asyncio.sleep(1)  # old BlueZ without the property: wait for our SetConfiguration
-        if endpoint.startswith(ENDPOINT_BASE) or path in self.transports:
+        await asyncio.sleep(FOREIGN_GRACE_S)  # our SetConfiguration arrives alongside the transport
+        if path in self.transports or not await self._exists(path, IFACE_TRANSPORT):
             return
         address = address_from_path(device)
         if not self.options.is_allowed(address):
             return
-        self.foreign[path] = (address, endpoint)
-        _LOGGER.warning(
-            "Ton von %s geht an einen anderen Bluetooth-Empfänger (%s)", address, describe_endpoint(endpoint)
-        )
+        self.foreign[path] = (address, "anderen Empfänger (vermutlich HA-Audiosystem)")
+        _LOGGER.warning("Ton von %s geht an einen anderen Bluetooth-Empfänger (vermutlich HA-Audiosystem)", address)
         if self.options.claim_streams:
             await self.claim_device(address, automatic=True)
 
+    async def _exists(self, path: str, iface: str) -> bool:
+        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
+        return iface in reply.body[0].get(path, {})
+
     async def claim_device(self, address: str, *, automatic: bool = False) -> bool:
-        """Configure the sender's A2DP stream with our endpoint (BlueZ remote endpoint API)."""
+        """Get the sender's A2DP stream onto our endpoint.
+
+        BlueZ only lets the owner of the current stream reconfigure it ("Operation not
+        permitted" for us), so if configuring directly fails while another sink holds the
+        stream, the A2DP link is dropped briefly and we configure it ourselves.
+        """
         address = address.upper()
         now = time.monotonic()
         recent = [t for t in self._claims.get(address, []) if now - t < 120]
         if automatic and len(recent) >= 3:
-            _LOGGER.error("Übernahme von %s mehrfach fehlgeschlagen – gebe auf (Geräteverwaltung: „Übernehmen“)",
+            _LOGGER.error("Übernahme von %s mehrfach fehlgeschlagen – gebe auf (Geräteverwaltung: „Ton übernehmen“)",
                           address)
             return False
         self._claims[address] = [*recent, now]
@@ -706,42 +710,61 @@ class BluezManager:
             device = await self._device_path(address)
         except KeyError:
             return False
-        await asyncio.sleep(0.5)
+        if await self._configure_from_remote(device, address, quiet=True):
+            return True
+        if not self._foreign_paths(address):
+            return False
+        _LOGGER.info("Trenne die Musikverbindung von %s kurz, um den Ton zu übernehmen", address)
+        try:
+            await self._call(device, IFACE_DEVICE, "DisconnectProfile", "s", [a2dp.A2DP_SOURCE_UUID])
+        except DBusError as err:
+            _LOGGER.warning("Trennen der Musikverbindung von %s fehlgeschlagen: %s", address, err)
+            return False
+        for _ in range(30):  # until the other sink's transport is gone
+            if not self._foreign_paths(address):
+                break
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.3)
+        return await self._configure_from_remote(device, address, quiet=False)
+
+    def _foreign_paths(self, address: str) -> list[str]:
+        return [p for p, (a, _) in self.foreign.items() if a == address.upper()]
+
+    async def _configure_from_remote(self, device: str, address: str, *, quiet: bool) -> bool:
+        """Configure one of the sender's source SEPs with our endpoint (codec order AAC, SBC)."""
+        log = _LOGGER.debug if quiet else _LOGGER.warning
         reply = await self._call("/", IFACE_OM, "GetManagedObjects")
-        seps = {
+        sources = {
             path: unwrap(ifaces[IFACE_ENDPOINT])
             for path, ifaces in reply.body[0].items()
             if path.startswith(device + "/") and IFACE_ENDPOINT in ifaces
+            and str(unwrap(ifaces[IFACE_ENDPOINT]).get("UUID", "")).lower() == a2dp.A2DP_SOURCE_UUID
         }
-        sources = {p: v for p, v in seps.items() if str(v.get("UUID", "")).lower() == a2dp.A2DP_SOURCE_UUID}
         if not sources:
-            _LOGGER.warning(
-                "Kann den Ton von %s nicht übernehmen: BlueZ zeigt keine Codec-Endpunkte des Geräts. "
-                "Gerät entfernen und neu koppeln hilft meist.", address)
+            log("Kann den Ton von %s nicht übernehmen: BlueZ zeigt keine Codec-Endpunkte des Geräts. "
+                "Wiedergabe am Gerät neu starten oder Gerät neu koppeln.", address)
             return False
-        ours = {codec: path for path, ep in self._endpoints for codec in [ep.codec]}
+        ours = {ep.codec: path for path, ep in self._endpoints}
         order = [a2dp.CODEC_AAC, a2dp.CODEC_SBC] if self.options.enable_aac else [a2dp.CODEC_SBC]
         for codec in order:
+            name = "AAC" if codec == a2dp.CODEC_AAC else "SBC"
             for sep_path, sep in sources.items():
                 if int(sep.get("Codec", -1)) != codec or codec not in ours:
                     continue
                 caps = bytes(sep.get("Capabilities", b""))
                 try:
-                    cfg = (a2dp.select_aac_config(caps) if codec == a2dp.CODEC_AAC
-                           else a2dp.select_sbc_config(caps))
+                    cfg = a2dp.select_aac_config(caps) if codec == a2dp.CODEC_AAC else a2dp.select_sbc_config(caps)
                 except ValueError as err:
-                    _LOGGER.debug("Codec %d von %s unpassend: %s", codec, address, err)
+                    _LOGGER.debug("%s von %s unpassend: %s", name, address, err)
                     continue
                 try:
                     await self._call(sep_path, IFACE_ENDPOINT, "SetConfiguration", "oa{sv}",
                                      [ours[codec], {"Capabilities": Variant("ay", cfg)}])
                 except DBusError as err:
-                    _LOGGER.warning("Übernahme von %s (%s) fehlgeschlagen: %s",
-                                    address, "AAC" if codec == a2dp.CODEC_AAC else "SBC", err)
+                    log("Übernahme von %s (%s) fehlgeschlagen: %s", address, name, err)
                     continue
-                _LOGGER.info("Ton von %s übernommen (%s)", address, "AAC" if codec == a2dp.CODEC_AAC else "SBC")
+                _LOGGER.info("Ton von %s übernommen (%s)", address, name)
                 return True
-        _LOGGER.warning("Kein passender Codec, um den Ton von %s zu übernehmen", address)
         return False
 
     # -- audio I/O ----------------------------------------------------------------------
