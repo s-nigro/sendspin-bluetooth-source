@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.3
+
+- Zeigt an, welche Codecs ein Zuspieler senden kann (Log „Codecs von …“ und Geräteverwaltung „Kann senden: …“).
+
 ## 0.6.2
 
 - Automatische Übernahme trennt die Musikverbindung nicht mehr (der Beamer trennte sich danach ganz). Nur noch per „Ton übernehmen“ in der Geräteverwaltung.

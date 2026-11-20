@@ -206,6 +206,7 @@ class BluezManager:
         # A2DP streams from senders that BlueZ handed to another sink (e.g. HA audio).
         self.foreign: dict[str, tuple[str, str]] = {}  # transport path -> (address, endpoint)
         self._claims: dict[str, list[float]] = {}
+        self.sender_codecs: dict[str, list[str]] = {}  # address -> codecs the sender offers
 
     # -- helpers --------------------------------------------------------------
 
@@ -479,8 +480,27 @@ class BluezManager:
             if path.startswith(prefix) and IFACE_DEVICE in ifaces
         }
 
+    def _note_sender_codecs(self, objects: dict) -> None:
+        """Remember which codecs connected senders offer (their A2DP source SEPs)."""
+        found: dict[str, list[str]] = {}
+        for path, ifaces in objects.items():
+            if not path.startswith(self.adapter_path + "/dev_") or IFACE_ENDPOINT not in ifaces:
+                continue
+            sep = unwrap(ifaces[IFACE_ENDPOINT])
+            if str(sep.get("UUID", "")).lower() != a2dp.A2DP_SOURCE_UUID:
+                continue
+            name = a2dp.codec_name(int(sep.get("Codec", -1)), bytes(sep.get("Capabilities", b"")))
+            found.setdefault(address_from_path(path), []).append(name)
+        for address, names in found.items():
+            names = sorted(set(names))
+            if self.sender_codecs.get(address) != names:
+                self.sender_codecs[address] = names
+                _LOGGER.info("Codecs von %s: %s", address, ", ".join(names))
+
     async def list_devices(self) -> list[dict]:
         """Devices on our adapter. ``source`` marks phones/TVs (vs. speakers of the BT bridge)."""
+        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
+        self._note_sender_codecs(reply.body[0])
         out = []
         for path, props in (await self._adapter_devices()).items():
             address = str(props.get("Address", address_from_path(path))).upper()
@@ -500,6 +520,7 @@ class BluezManager:
                 "delay_ms": self.store.delay_for(address),
                 "custom_delay": self.store.custom_delay(address) is not None,
                 "foreign": next((what for a, what in self.foreign.values() if a == address), None),
+                "sender_codecs": self.sender_codecs.get(address, []),
             })
         out.sort(key=lambda d: (not d["source"], d["name"].lower()))
         return out
@@ -677,7 +698,9 @@ class BluezManager:
         if str(props.get("UUID", "")).lower() != a2dp.A2DP_SINK_UUID:
             return  # e.g. the BT bridge streaming to its speakers
         await asyncio.sleep(FOREIGN_GRACE_S)  # our SetConfiguration arrives alongside the transport
-        if path in self.transports or not await self._exists(path, IFACE_TRANSPORT):
+        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
+        self._note_sender_codecs(reply.body[0])
+        if path in self.transports or IFACE_TRANSPORT not in reply.body[0].get(path, {}):
             return
         address = address_from_path(device)
         if not self.options.is_allowed(address):
@@ -686,10 +709,6 @@ class BluezManager:
         _LOGGER.warning("Ton von %s geht an einen anderen Bluetooth-Empfänger (vermutlich HA-Audiosystem)", address)
         if self.options.claim_streams:
             await self.claim_device(address, automatic=True)
-
-    async def _exists(self, path: str, iface: str) -> bool:
-        reply = await self._call("/", IFACE_OM, "GetManagedObjects")
-        return iface in reply.body[0].get(path, {})
 
     async def claim_device(self, address: str, *, automatic: bool = False) -> bool:
         """Get the sender's A2DP stream onto our endpoint.

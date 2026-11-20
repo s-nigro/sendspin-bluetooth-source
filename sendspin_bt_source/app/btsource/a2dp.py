@@ -310,3 +310,28 @@ def peak_level(pcm: bytes) -> int:
         return 0
     samples = np.frombuffer(pcm, dtype=np.int16)
     return int(np.max(np.abs(samples.astype(np.int32))))
+
+
+VENDOR_CODECS = {
+    (0x004F, 0x0001): "aptX",
+    (0x00D7, 0x0024): "aptX HD",
+    (0x000A, 0x0002): "aptX LL",
+    (0x012D, 0x00AA): "LDAC",
+    (0x0075, 0x0102): "Samsung Scalable",
+    (0x003A, 0x0001): "Opus",
+}
+
+
+def codec_name(codec: int, capabilities: bytes = b"") -> str:
+    """Human name of an A2DP codec (vendor codecs are identified by vendor and codec ID)."""
+    if codec == CODEC_SBC:
+        return "SBC"
+    if codec == CODEC_AAC:
+        return "AAC"
+    if codec == 0x01:
+        return "MP3"
+    if codec == 0xFF and len(capabilities) >= 6:
+        vendor = int.from_bytes(capabilities[0:4], "little")
+        cid = int.from_bytes(capabilities[4:6], "little")
+        return VENDOR_CODECS.get((vendor, cid), f"Hersteller-Codec {vendor:04x}:{cid:04x}")
+    return f"Codec {codec}"

@@ -169,6 +169,7 @@ function deviceCard(d) {
       <div class="row"><div class="grow">
         <div class="name">${esc(d.name)}</div><div class="mac">${mac}</div>
         <div class="chips">${chips.join("")}</div>
+        ${d.sender_codecs && d.sender_codecs.length ? `<div class="hint" style="margin-top:6px">Kann senden: ${d.sender_codecs.map(esc).join(", ")}</div>` : ""}
       </div></div>
       ${delay}
       <div class="actions">

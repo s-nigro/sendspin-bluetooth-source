@@ -148,3 +148,11 @@ def test_aac_latm_decode(rate):
     assert a2dp.peak_level(out) > 8000
     spec = np.abs(np.fft.rfft(samples[4000:20000, 0]))
     assert abs(np.argmax(spec) * 48000 / 16000 - 1000) < 20
+
+
+def test_codec_names():
+    assert a2dp.codec_name(a2dp.CODEC_SBC) == "SBC"
+    assert a2dp.codec_name(a2dp.CODEC_AAC) == "AAC"
+    assert a2dp.codec_name(0xFF, bytes([0x4F, 0, 0, 0, 0x01, 0x00, 0x22])) == "aptX"
+    assert a2dp.codec_name(0xFF, bytes([0x2D, 0x01, 0, 0, 0xAA, 0x00, 0x3C])) == "LDAC"
+    assert a2dp.codec_name(0xFF, bytes([1, 0, 0, 0, 2, 0])).startswith("Hersteller-Codec")
