@@ -61,7 +61,7 @@ class Options:
         for mac in self.remove_devices:
             if not _MAC_RE.match(mac):
                 raise ValueError(f"remove_devices: '{mac}' ist keine gültige MAC-Adresse")
-        self.delay_report_ms = max(0, min(3000, int(self.delay_report_ms)))
+        self.delay_report_ms = max(0, min(6000, int(self.delay_report_ms)))
         self.silence_timeout = max(0, int(self.silence_timeout))
         if self.stream_codec not in ("pcm", "flac", "opus"):
             self.stream_codec = "pcm"

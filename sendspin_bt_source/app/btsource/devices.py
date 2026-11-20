@@ -10,7 +10,7 @@ from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
-MAX_DELAY_MS = 3000
+MAX_DELAY_MS = 6000  # AVDTP delay reports are 16 bit in 1/10 ms (max 6553 ms)
 
 
 class DeviceStore:

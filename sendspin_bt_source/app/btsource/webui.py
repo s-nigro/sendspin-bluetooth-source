@@ -124,8 +124,8 @@ class WebUI:
     async def _delay(self, request: web.Request) -> web.Response:
         body = await _json(request)
         value = body.get("delay_ms")
-        if value is not None and (not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 3000):
-            raise web.HTTPBadRequest(text="delay_ms: 0–3000 oder null")
+        if value is not None and (not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 6000):
+            raise web.HTTPBadRequest(text="delay_ms: 0–6000 oder null")
         effective = await self.bluez.set_device_delay(_mac(request), value)
         return web.json_response({"ok": True, "delay_ms": effective})
 

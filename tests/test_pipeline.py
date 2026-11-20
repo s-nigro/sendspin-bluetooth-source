@@ -77,7 +77,7 @@ def test_options_validation(tmp_path):
     o = Options.load(p)
     assert o.device_name == "Beamer"
     assert o.allowed_devices == ["AA:BB:CC:DD:EE:FF"]
-    assert o.delay_report_ms == 3000
+    assert o.delay_report_ms == 6000
     assert o.is_allowed("aa:bb:cc:dd:ee:ff") and not o.is_allowed("11:22:33:44:55:66")
     p.write_text('{"allowed_devices":["kaputt"]}')
     with pytest.raises(ValueError):

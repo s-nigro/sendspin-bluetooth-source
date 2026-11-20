@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+- Verzögerung bis 6000 ms einstellbar (vorher 3000 ms; der Beamer brauchte mehr).
+
 ## 0.7.1
 
 - Zeigt, ob ein Zuspieler die Verzögerungsmeldung (Delay Reporting) unterstützt und ob sie gemeldet wurde (Log „Codecs von …“ und Geräteverwaltung).

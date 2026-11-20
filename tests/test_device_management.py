@@ -25,7 +25,7 @@ def test_store_persists_and_defaults(tmp_path):
     assert store.delay_for(PHONE) == 1000
     store.remember(PHONE, "iPhone")
     assert store.set_delay(PHONE.lower(), 1250) == 1250
-    assert store.set_delay("AA:BB:CC:DD:EE:FF", 99999) == 3000  # clamped
+    assert store.set_delay("AA:BB:CC:DD:EE:FF", 99999) == 6000  # clamped
     again = DeviceStore(path, 800)
     assert again.delay_for(PHONE) == 1250
     assert again.known(PHONE)
@@ -124,7 +124,7 @@ async def test_web_api(manager):
 
         r = await client.post(f"/api/devices/{PHONE}/delay", json={"delay_ms": 1300})
         assert (await r.json())["delay_ms"] == 1300
-        assert (await client.post(f"/api/devices/{PHONE}/delay", json={"delay_ms": 5000})).status == 400
+        assert (await client.post(f"/api/devices/{PHONE}/delay", json={"delay_ms": 7000})).status == 400
         assert (await client.post("/api/devices/nope/remove", json={})).status == 400
         assert (await client.post(f"/api/devices/{PHONE}/remove", json={})).status == 200
         assert (await client.post("/api/pairing", json={"seconds": 180})).status == 200

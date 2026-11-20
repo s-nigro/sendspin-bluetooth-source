@@ -158,7 +158,7 @@ function deviceCard(d) {
       <span>Verzögerung</span>
       <span class="stepper">
         <button data-step="-100" data-mac="${mac}" aria-label="100 ms weniger">−100</button>
-        <input type="number" min="0" max="3000" step="10" value="${d.delay_ms}" data-delay="${mac}" aria-label="Verzögerung in ms">
+        <input type="number" min="0" max="6000" step="10" value="${d.delay_ms}" data-delay="${mac}" aria-label="Verzögerung in ms">
         <span>ms</span>
         <button data-step="100" data-mac="${mac}" aria-label="100 ms mehr">+100</button>
       </span>
@@ -248,12 +248,12 @@ document.addEventListener("click", (e) => {
     act(() => api("api/pairing", {seconds: secs}), secs ? "Kopplungsmodus an" : "Kopplungsmodus aus");
   } else if (d.step) {
     const el = document.querySelector(`input[data-delay="${d.mac}"]`);
-    el.value = Math.max(0, Math.min(3000, (Number(el.value) || 0) + Number(d.step)));
+    el.value = Math.max(0, Math.min(6000, (Number(el.value) || 0) + Number(d.step)));
     dirty.add(d.mac);
   } else if (d.save) {
     const el = document.querySelector(`input[data-delay="${d.save}"]`);
     const v = Math.round(Number(el.value));
-    if (!Number.isFinite(v) || v < 0 || v > 3000) { toast("Bitte 0–3000 ms eingeben"); return; }
+    if (!Number.isFinite(v) || v < 0 || v > 6000) { toast("Bitte 0–6000 ms eingeben"); return; }
     dirty.delete(d.save);
     act(() => api(`api/devices/${d.save}/delay`, {delay_ms: v}),
         `Verzögerung ${v} ms gespeichert – wirkt spätestens beim nächsten Abspielen`);
