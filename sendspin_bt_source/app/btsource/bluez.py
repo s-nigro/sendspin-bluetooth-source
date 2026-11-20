@@ -74,6 +74,7 @@ class TransportInfo:
     fd: int | None = None
     read_mtu: int = 0
     stats: dict = field(default_factory=dict)
+    delay_reported: bool | None = None  # last attempt to report our delay to the sender
 
 
 class StreamListener:
@@ -207,6 +208,7 @@ class BluezManager:
         self.foreign: dict[str, tuple[str, str]] = {}  # transport path -> (address, endpoint)
         self._claims: dict[str, list[float]] = {}
         self.sender_codecs: dict[str, list[str]] = {}  # address -> codecs the sender offers
+        self.sender_delay_reporting: dict[str, bool] = {}  # address -> sender supports delay reports
         # Called after our endpoints are (re-)registered with BlueZ.
         self.on_registered = None
 
@@ -488,19 +490,27 @@ class BluezManager:
     def _note_sender_codecs(self, objects: dict) -> None:
         """Remember which codecs connected senders offer (their A2DP source SEPs)."""
         found: dict[str, list[str]] = {}
+        delay: dict[str, bool] = {}
         for path, ifaces in objects.items():
             if not path.startswith(self.adapter_path + "/dev_") or IFACE_ENDPOINT not in ifaces:
                 continue
             sep = unwrap(ifaces[IFACE_ENDPOINT])
             if str(sep.get("UUID", "")).lower() != a2dp.A2DP_SOURCE_UUID:
                 continue
+            address = address_from_path(path)
             name = a2dp.codec_name(int(sep.get("Codec", -1)), bytes(sep.get("Capabilities", b"")))
-            found.setdefault(address_from_path(path), []).append(name)
+            found.setdefault(address, []).append(name)
+            if "DelayReporting" in sep:
+                delay[address] = delay.get(address, False) or bool(sep["DelayReporting"])
         for address, names in found.items():
             names = sorted(set(names))
-            if self.sender_codecs.get(address) != names:
+            dr = delay.get(address)
+            if self.sender_codecs.get(address) != names or self.sender_delay_reporting.get(address) != dr:
                 self.sender_codecs[address] = names
-                _LOGGER.info("Codecs von %s: %s", address, ", ".join(names))
+                if dr is not None:
+                    self.sender_delay_reporting[address] = dr
+                _LOGGER.info("Codecs von %s: %s – Verzögerungsmeldung: %s", address, ", ".join(names),
+                             {True: "unterstützt", False: "NICHT unterstützt", None: "unbekannt"}[dr])
 
     async def list_devices(self) -> list[dict]:
         """Devices on our adapter. ``source`` marks phones/TVs (vs. speakers of the BT bridge)."""
@@ -527,6 +537,8 @@ class BluezManager:
                 "custom_delay": self.store.custom_delay(address) is not None,
                 "foreign": next((what for a, what in self.foreign.values() if a == address), None),
                 "sender_codecs": self.sender_codecs.get(address, []),
+                "delay_reporting": self.sender_delay_reporting.get(address),
+                "delay_reported": live[-1].delay_reported if live else None,
             })
         out.sort(key=lambda d: (not d["source"], d["name"].lower()))
         return out
@@ -633,6 +645,8 @@ class BluezManager:
         try:
             await self.set_prop(info.path, IFACE_TRANSPORT, "Delay", "q", value)
         except DBusError as err:
+            if not quiet:
+                info.delay_reported = False
             if quiet:
                 _LOGGER.debug("Delay noch nicht meldbar (%s)", err)
             elif not self._delay_warned:
@@ -642,6 +656,7 @@ class BluezManager:
                     "kein Delay Reporting oder die BlueZ-Version des Hosts ist zu alt.", err
                 )
             return False
+        info.delay_reported = True
         _LOGGER.info("Verzögerung %d ms an %s gemeldet", delay_ms, info.name or info.address)
         return True
 

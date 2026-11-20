@@ -150,7 +150,7 @@ def _with_beamer(objects, *, transports=()):
     }}
     objects[BEAMER_PATH + "/sep1"] = {bluez.IFACE_ENDPOINT: {
         "UUID": Variant("s", a2dp.A2DP_SOURCE_UUID), "Codec": Variant("y", a2dp.CODEC_SBC),
-        "Capabilities": Variant("ay", bytes([0xFF, 0xFF, 2, 53])),
+        "Capabilities": Variant("ay", bytes([0xFF, 0xFF, 2, 53])), "DelayReporting": Variant("b", False),
     }}
     for t in transports:
         objects[t] = {bluez.IFACE_TRANSPORT: {}}
@@ -192,6 +192,8 @@ async def test_foreign_stream_taken_over_after_disconnect(manager, monkeypatch):
     sep, iface, _, (local, props) = [c for c in calls if c[2] == "SetConfiguration"][-1]
     assert sep == BEAMER_PATH + "/sep1" and iface == bluez.IFACE_ENDPOINT and local.endswith("/sbc")
     a2dp.parse_sbc_config(bytes(props["Capabilities"].value))
+    beamer = {d["address"]: d for d in await manager.list_devices()}[BEAMER]
+    assert beamer["sender_codecs"] == ["SBC"] and beamer["delay_reporting"] is False
     disconnect = [c for c in calls if c[2] == "DisconnectProfile"][0]
     assert disconnect[0] == BEAMER_PATH and disconnect[3] == [a2dp.A2DP_SOURCE_UUID]
 

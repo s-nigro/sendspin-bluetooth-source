@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- Zeigt, ob ein Zuspieler die Verzögerungsmeldung (Delay Reporting) unterstützt und ob sie gemeldet wurde (Log „Codecs von …“ und Geräteverwaltung).
+
 ## 0.7.0
 
 - Neue Option `restart_audio_on_start` (Standard an): Nach dem Anmelden der

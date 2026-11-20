@@ -171,6 +171,9 @@ function deviceCard(d) {
         <div class="name">${esc(d.name)}</div><div class="mac">${mac}</div>
         <div class="chips">${chips.join("")}</div>
         ${d.sender_codecs && d.sender_codecs.length ? `<div class="hint" style="margin-top:6px">Kann senden: ${d.sender_codecs.map(esc).join(", ")}</div>` : ""}
+        ${d.delay_reporting === false ? `<div class="hint" style="margin-top:6px;color:var(--warn)">Dieses Gerät unterstützt keine Verzögerungsmeldung – es kann das Bild nicht anpassen. Lippensynchron wird es nur mit kleinerer Target latency in Music Assistant.</div>`
+          : d.delay_reported === false ? `<div class="hint" style="margin-top:6px;color:var(--warn)">Verzögerung konnte nicht gemeldet werden (Details im Log).</div>`
+          : d.delay_reported ? `<div class="hint" style="margin-top:6px">Verzögerung wurde gemeldet${d.delay_reporting ? " · Gerät unterstützt Verzögerungsmeldung" : ""}.</div>` : ""}
       </div></div>
       ${delay}
       <div class="actions">
