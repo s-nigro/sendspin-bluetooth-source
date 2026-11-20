@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- Automatische Übernahme trennt die Musikverbindung nicht mehr (der Beamer trennte sich danach ganz). Nur noch per „Ton übernehmen“ in der Geräteverwaltung.
+
 ## 0.6.1
 
 - Übernahme klappt jetzt auch, wenn BlueZ das direkte Umkonfigurieren verweigert

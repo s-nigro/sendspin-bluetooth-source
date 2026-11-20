@@ -185,7 +185,10 @@ async def test_foreign_stream_taken_over_after_disconnect(manager, monkeypatch):
 
     await manager._check_transport(foreign_t, {"Device": BEAMER_PATH, "UUID": a2dp.A2DP_SINK_UUID})
     members = [c[2] for c in calls if c[2] in ("SetConfiguration", "DisconnectProfile")]
-    assert members == ["SetConfiguration", "DisconnectProfile", "SetConfiguration"]
+    assert members == ["SetConfiguration"]  # automatic: no disconnect
+    assert await manager.claim_device(BEAMER)  # manual: disconnect, then configure
+    members = [c[2] for c in calls if c[2] in ("SetConfiguration", "DisconnectProfile")]
+    assert members == ["SetConfiguration", "SetConfiguration", "DisconnectProfile", "SetConfiguration"]
     sep, iface, _, (local, props) = [c for c in calls if c[2] == "SetConfiguration"][-1]
     assert sep == BEAMER_PATH + "/sep1" and iface == bluez.IFACE_ENDPOINT and local.endswith("/sbc")
     a2dp.parse_sbc_config(bytes(props["Capabilities"].value))

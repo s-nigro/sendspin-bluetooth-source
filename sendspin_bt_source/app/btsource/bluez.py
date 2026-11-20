@@ -710,9 +710,11 @@ class BluezManager:
             device = await self._device_path(address)
         except KeyError:
             return False
-        if await self._configure_from_remote(device, address, quiet=True):
+        if await self._configure_from_remote(device, address, quiet=automatic):
             return True
-        if not self._foreign_paths(address):
+        if automatic or not self._foreign_paths(address):
+            # Dropping the link loses the sender's endpoints on HA OS and the sender then
+            # disconnects completely, so only do that when asked for in the device page.
             return False
         _LOGGER.info("Trenne die Musikverbindung von %s kurz, um den Ton zu übernehmen", address)
         try:
