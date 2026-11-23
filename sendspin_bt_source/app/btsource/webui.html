@@ -46,9 +46,15 @@
   .delay input { width: 90px; font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
                  background: var(--bg); color: var(--text); text-align: right; }
   .stepper { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  table.res td button { padding: 4px 8px; min-height: 30px; }
+  @media (max-width: 360px) { .stepper { flex-wrap: wrap; white-space: normal; } }
   .hint { color: var(--muted); font-size: 13px; }
   .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .empty { color: var(--muted); text-align: center; padding: 18px; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.res th, table.res td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  table.res td.num, table.res th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
   .status-grid .k { color: var(--muted); font-size: 13px; }
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text);
@@ -90,6 +96,26 @@
       Entfernen trennt sie auch dort.</p>
     <div id="others"></div>
   </details>
+  <h2>Einmessen</h2>
+  <div class="card" id="cal">
+    <div id="cal-setup" class="hint"></div>
+    <div id="cal-body" hidden>
+      <ol class="hint" style="margin:0 0 10px 18px;padding:0">
+        <li>In Music Assistant den Live Input „<span class="devname"></span>“ auf der Box oder Gruppe abspielen.</li>
+        <li>Den ESP32 neben die Box legen, Lautstärke normal.</li>
+        <li>Namen eintragen und „Messen“ tippen (dauert ca. 20 s, es piept 6×).</li>
+      </ol>
+      <div class="row">
+        <input id="cal-label" placeholder="Box/Gruppe, z. B. JBL" maxlength="60"
+               style="flex:1 1 180px;font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+        <button class="primary" data-cal="measure">Messen</button>
+        <button data-cal="test">Verbindung testen</button>
+      </div>
+      <div id="cal-status" class="hint" style="margin-top:10px"></div>
+      <div id="cal-results" style="margin-top:12px"></div>
+      <div id="cal-default" class="hint" style="margin-top:10px"></div>
+    </div>
+  </div>
 </main>
 <div id="toast"></div>
 
@@ -184,6 +210,51 @@ function deviceCard(d) {
     </div>`;
 }
 
+function renderCalibration(c) {
+  const box = $("cal");
+  if (!c) { box.hidden = true; return; }
+  document.querySelectorAll(".devname").forEach((el) => { el.textContent = state.name; });
+  if (!c.configured) {
+    $("cal-setup").innerHTML = "Zum Einmessen ein ESP32 mit Mikrofon und der ESPHome-Komponente " +
+      "<code>sendspin_latency_mic</code> verwenden und in den Add-on-Optionen " +
+      "<code>calibration_mic</code> (IP/Name) und <code>calibration_key</code> eintragen. Anleitung in der Add-on-Dokumentation.";
+    $("cal-body").hidden = true;
+    return;
+  }
+  $("cal-setup").textContent = `Mess-Mikrofon: ${c.mic}`;
+  $("cal-body").hidden = false;
+  document.querySelectorAll("[data-cal]").forEach((b) => { b.disabled = c.busy; });
+  $("cal-status").innerHTML = c.error
+    ? `<span style="color:var(--danger)">${esc(c.status)}: ${esc(c.error)}</span>`
+    : esc(c.status);
+  const ms = c.measurements;
+  if (!ms.length) {
+    setHTML($("cal-results"), "");
+  } else {
+    const slowest = Math.max(...ms.map((m) => m.latency_ms));
+    const rows = ms.map((m, i) => `
+      <tr>
+        <td>${esc(m.label)}<div class="hint">${new Date(m.time * 1000).toLocaleString("de-DE", {dateStyle: "short", timeStyle: "short"})}</div></td>
+        <td class="num">${Math.round(m.latency_ms)} ms<div class="hint">±${Math.round(m.spread_ms / 2)} ms</div></td>
+        <td class="num">${slowest - m.latency_ms > 0.5 ? "+" + Math.round(slowest - m.latency_ms) + " ms" : "–"}</td>
+        <td class="num">
+          <button data-cal-default="${Math.round(m.latency_ms)}">Als Standard</button>
+          <button class="danger" data-cal-delete="${i}" aria-label="Messung löschen">✕</button>
+        </td>
+      </tr>`).join("");
+    setHTML($("cal-results"), `
+      <div class="table-wrap"><table class="res">
+        <thead><tr><th>Messung</th><th class="num">Latenz</th><th class="num">Ausgleich*</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p class="hint">* So viel Verzögerung bräuchte diese Box in Music Assistant (Player-Einstellungen), damit sie
+        gleichzeitig mit der langsamsten spielt.</p>`);
+  }
+  $("cal-default").innerHTML = c.measured_default_ms != null
+    ? `Standard für alle Zuspieler: <b>${c.measured_default_ms} ms</b> (gemessen) · <button data-cal-default="reset">Zurück auf ${c.option_default_ms} ms (Option)</button>`
+    : `Standard für alle Zuspieler: ${c.option_default_ms} ms (Option <code>delay_report_ms</code>). Nach dem Messen der Gruppe „Als Standard“ wählen.`;
+}
+
 function render() {
   if (!state) return;
   $("title").textContent = state.name;
@@ -197,6 +268,7 @@ function render() {
     : `<span class="chip"><span class="dot"></span>Kein Signal</span>`);
   $("defdelay").textContent = `${state.default_delay_ms} ms`;
   renderPairing(state.pairing);
+  renderCalibration(state.calibration);
 
   // Keep fields the user is editing.
   const editing = {};
@@ -260,6 +332,16 @@ document.addEventListener("click", (e) => {
   } else if (d.reset) {
     dirty.delete(d.reset);
     act(() => api(`api/devices/${d.reset}/delay`, {delay_ms: null}), "Auf Standard zurückgesetzt");
+  } else if (d.cal === "measure") {
+    act(() => api("api/calibration/measure", {label: $("cal-label").value}), "Messung gestartet");
+  } else if (d.cal === "test") {
+    act(async () => { const r = await api("api/calibration/test", {}); toast(`ESP32 erreichbar · Laufzeit ${r.rtt_ms} ms`); });
+  } else if (d.calDefault) {
+    const v = d.calDefault === "reset" ? null : Number(d.calDefault);
+    act(() => api("api/calibration/default", {delay_ms: v}),
+        v == null ? "Standard aus den Optionen" : `Standard ${v} ms für alle Zuspieler`);
+  } else if (d.calDelete !== undefined) {
+    act(() => api("api/calibration/delete", {index: Number(d.calDelete)}), "Messung gelöscht");
   } else if (d.claim) {
     act(() => api(`api/devices/${d.claim}/claim`, {}), "Ton übernommen");
   } else if (d.disconnect) {

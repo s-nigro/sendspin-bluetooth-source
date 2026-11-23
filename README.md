@@ -21,6 +21,9 @@ Home Assistant → Einstellungen → Add-ons → Add-on-Store → ⋮ → Reposi
   - `a2dp.py`: Codec-Konfiguration, RTP, Dekodierung (PyAV) auf 48 kHz Stereo
   - `sendspin_link.py`: Sendspin-Client (aiosendspin) mit Quellrolle und Kopplung
   - `service.py`: Pipeline, Signalerkennung, Lautstärke
+  - `calibration.py`: Latenzmessung mit ESP32-Mikrofon (Messton, Uhrenabgleich, Auswertung)
+  - `webui.py`/`webui.html`: Geräteverwaltung und Einmessen (HA-Ingress)
+- ESPHome-Komponente fürs Mess-Mikrofon: [`components/sendspin_latency_mic/`](components/sendspin_latency_mic/)
 
 ## Tests
 

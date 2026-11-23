@@ -13,6 +13,7 @@ from dbus_fast import DBusError
 
 if TYPE_CHECKING:
     from .bluez import BluezManager
+    from .calibration import Calibrator
     from .sendspin_link import SendspinLink
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,9 +27,11 @@ PAIRING_SECONDS = (60, 180, 600)
 
 
 class WebUI:
-    def __init__(self, bluez: BluezManager, link: SendspinLink, port: int, *, allow_local: bool = False) -> None:
+    def __init__(self, bluez: BluezManager, link: SendspinLink, port: int, *, allow_local: bool = False,
+                 calibrator: Calibrator | None = None) -> None:
         self.bluez = bluez
         self.link = link
+        self.calibrator = calibrator
         self.port = port
         self._allowed = INGRESS_PEERS | (LOCAL_PEERS if allow_local else set())
         self._runner: web.AppRunner | None = None
@@ -41,6 +44,10 @@ class WebUI:
             web.post("/api/devices/{mac}/disconnect", self._disconnect),
             web.post("/api/devices/{mac}/delay", self._delay),
             web.post("/api/devices/{mac}/claim", self._claim),
+            web.post("/api/calibration/test", self._cal_test),
+            web.post("/api/calibration/measure", self._cal_measure),
+            web.post("/api/calibration/default", self._cal_default),
+            web.post("/api/calibration/delete", self._cal_delete),
         ])
 
     async def start(self) -> None:
@@ -91,6 +98,7 @@ class WebUI:
                 "signal": self.link.signal_present,
             },
             "devices": await b.list_devices(),
+            "calibration": self.calibrator.state() if self.calibrator else None,
         })
 
     async def _pairing(self, request: web.Request) -> web.Response:
@@ -119,6 +127,52 @@ class WebUI:
         ok = await self.bluez.claim_device(_mac(request))
         if not ok:
             return web.json_response({"error": "Übernahme fehlgeschlagen – Details im Add-on-Log"}, status=409)
+        return web.json_response({"ok": True})
+
+    # -- latency measurement ----------------------------------------------------------
+
+    def _cal(self) -> Calibrator:
+        if self.calibrator is None:
+            raise web.HTTPNotFound(text="Messung nicht verfügbar")
+        return self.calibrator
+
+    async def _cal_test(self, request: web.Request) -> web.Response:
+        from .calibration import MeasurementError
+
+        cal = self._cal()
+        if not cal.configured:
+            return web.json_response({"error": "Mess-Mikrofon in den Add-on-Optionen eintragen"}, status=409)
+        try:
+            sync = await cal.test_connection()
+        except (MeasurementError, OSError, ValueError) as err:
+            return web.json_response({"error": str(err)}, status=409)
+        return web.json_response({"ok": True, "rtt_ms": round(sync.rtt_us / 1000, 1), "pongs": sync.samples})
+
+    async def _cal_measure(self, request: web.Request) -> web.Response:
+        body = await _json(request)
+        try:
+            self._cal().start_measurement(str(body.get("label", "")))
+        except RuntimeError as err:
+            return web.json_response({"error": str(err)}, status=409)
+        return web.json_response({"ok": True})
+
+    async def _cal_default(self, request: web.Request) -> web.Response:
+        body = await _json(request)
+        value = body.get("delay_ms")
+        if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool)
+                                  or not 0 <= value <= 6000):
+            raise web.HTTPBadRequest(text="delay_ms: 0–6000 oder null")
+        effective = self._cal().set_default(None if value is None else round(value))
+        for info in list(self.bluez.transports.values()):
+            await self.bluez.push_delay(info)
+        return web.json_response({"ok": True, "default_delay_ms": effective})
+
+    async def _cal_delete(self, request: web.Request) -> web.Response:
+        body = await _json(request)
+        index = body.get("index")
+        if not isinstance(index, int):
+            raise web.HTTPBadRequest(text="index erwartet")
+        self._cal().delete(index)
         return web.json_response({"ok": True})
 
     async def _delay(self, request: web.Request) -> web.Response:

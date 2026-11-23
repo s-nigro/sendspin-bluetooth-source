@@ -1,3 +1,4 @@
 aiosendspin[source]==10.3.0
 dbus-fast==5.2.0
 aiohttp>=3.9.2
+numpy>=1.26

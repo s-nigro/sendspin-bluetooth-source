@@ -47,5 +47,14 @@ configuration:
   set_device_class:
     name: Present as loudspeaker
     description: Sets the Bluetooth device class to audio/loudspeaker so TVs list it as a speaker.
+  calibration_mic:
+    name: Measuring microphone (ESP32)
+    description: IP address or name of the ESP32 running the ESPHome component sendspin_latency_mic, optionally with :port (default 8939).
+  calibration_key:
+    name: Key for the measuring microphone
+    description: Same as key in the ESPHome configuration (at least 8 characters).
+  mic_offset_ms:
+    name: Microphone correction (ms)
+    description: Subtracted from every result if the microphone itself has a known delay. Usually 0.
   log_level:
     name: Log level

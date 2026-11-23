@@ -47,5 +47,14 @@ configuration:
   set_device_class:
     name: Als Lautsprecher ausgeben
     description: Setzt die Bluetooth-Geräteklasse auf Audio/Lautsprecher, damit TVs das Gerät als Box anzeigen.
+  calibration_mic:
+    name: Mess-Mikrofon (ESP32)
+    description: IP-Adresse oder Name des ESP32 mit der ESPHome-Komponente sendspin_latency_mic, optional mit :Port (Standard 8939).
+  calibration_key:
+    name: Schlüssel für das Mess-Mikrofon
+    description: Derselbe Schlüssel wie key in der ESPHome-Konfiguration (mind. 8 Zeichen).
+  mic_offset_ms:
+    name: Mikrofon-Korrektur (ms)
+    description: Wird von jedem Messwert abgezogen, falls das Mikrofon selbst eine bekannte Verzögerung hat. Normalerweise 0.
   log_level:
     name: Log-Level

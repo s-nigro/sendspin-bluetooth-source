@@ -35,6 +35,11 @@ class Options:
     server_url: str = ""
     listen_port: int = 8935
     set_device_class: bool = True
+    calibration_mic: str = ""
+    """ESP32 with the sendspin_latency_mic ESPHome component: IP/hostname[:port]."""
+    calibration_key: str = ""
+    mic_offset_ms: int = 0
+    """Known input latency of the measuring microphone, subtracted from results."""
     web_port: int = 8936
     """Port of the device management page (HA ingress); 0 = off."""
     log_level: str = "info"
@@ -66,6 +71,9 @@ class Options:
         if self.stream_codec not in ("pcm", "flac", "opus"):
             self.stream_codec = "pcm"
         self.server_url = (self.server_url or "").strip()
+        self.calibration_mic = (self.calibration_mic or "").strip()
+        self.calibration_key = (self.calibration_key or "").strip()
+        self.mic_offset_ms = max(-500, min(500, int(self.mic_offset_ms or 0)))
 
     def is_allowed(self, address: str) -> bool:
         return not self.allowed_devices or address.upper() in self.allowed_devices

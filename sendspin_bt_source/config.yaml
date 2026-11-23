@@ -1,5 +1,5 @@
 name: Sendspin Bluetooth Source
-version: "0.7.2"
+version: "0.8.0"
 slug: sendspin_bt_source
 description: >-
   Bluetooth-Lautsprecher für Beamer, TV und Handy: Ton per Bluetooth empfangen
@@ -41,6 +41,9 @@ options:
   server_url: ""
   listen_port: 8935
   set_device_class: true
+  calibration_mic: ""
+  calibration_key: ""
+  mic_offset_ms: 0
   log_level: info
 schema:
   device_name: str
@@ -61,4 +64,7 @@ schema:
   server_url: str?
   listen_port: port
   set_device_class: bool
+  calibration_mic: str?
+  calibration_key: password?
+  mic_offset_ms: int(-500,500)
   log_level: list(debug|info|warning|error)

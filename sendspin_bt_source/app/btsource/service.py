@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from . import a2dp, ha
+from .calibration import CalibrationStore, Calibrator
 from .bluez import BluezManager, StreamListener, TransportInfo
 from .config import Options
 from .devices import DeviceStore
@@ -30,6 +31,8 @@ class AudioPipeline(StreamListener):
         self._last_sound = 0.0
         self._queue: asyncio.Queue[tuple[bytes, int]] = asyncio.Queue(maxsize=400)
         self._tasks: list[asyncio.Task] = []
+        # While measuring latency, Bluetooth audio is muted and a test signal is injected.
+        self.calibrating = False
 
     def start(self) -> None:
         self._tasks = [
@@ -68,8 +71,17 @@ class AudioPipeline(StreamListener):
         self._gain = a2dp.a2dp_volume_to_gain(volume)
         _LOGGER.debug("Lautstärke vom Gerät: %d/127 (Faktor %.2f)", volume, self._gain)
 
+    def inject(self, pcm: bytes, arrival_ns: int) -> None:
+        """Queue PCM (48 kHz s16 stereo) as if it had arrived at ``arrival_ns``."""
+        if not self.link.streaming:
+            return
+        try:
+            self._queue.put_nowait((pcm, arrival_ns))
+        except asyncio.QueueFull:
+            _LOGGER.debug("Sendepuffer voll – Messton-Paket verworfen")
+
     def on_packet(self, transport: TransportInfo, data: bytes, arrival_ns: int) -> None:
-        if transport.path != self._current:
+        if transport.path != self._current or self.calibrating:
             return
         dec = self._decoders.get(transport.path)
         if dec is None:
@@ -95,6 +107,8 @@ class AudioPipeline(StreamListener):
             await self.link.feed(pcm, arrival_ns, time.monotonic_ns())
 
     def signal_present(self, now: float | None = None) -> bool:
+        if self.calibrating:
+            return True
         if self._current is None:
             return False
         if self._last_sound == 0.0:
@@ -116,6 +130,8 @@ class Service:
         self.link = SendspinLink(options, data_dir, on_pairing_code=notifier)
         self.pipeline = AudioPipeline(options, self.link)
         self.store = DeviceStore(Path(data_dir) / "devices.json", options.delay_report_ms)
+        self.calibrator = Calibrator(options, self.pipeline, self.link, self.store,
+                                     CalibrationStore.load(Path(data_dir) / "calibration.json"))
         self.bluez: BluezManager | None = None
         self.webui: WebUI | None = None
 
@@ -129,7 +145,7 @@ class Service:
         if self.options.restart_audio_on_start:
             self._audio_task = asyncio.create_task(ha.restart_audio())
         if self.options.web_port:
-            self.webui = WebUI(self.bluez, self.link, self.options.web_port)
+            self.webui = WebUI(self.bluez, self.link, self.options.web_port, calibrator=self.calibrator)
             try:
                 await self.webui.start()
             except OSError as err:
@@ -142,6 +158,7 @@ class Service:
             await self.shutdown()
 
     async def shutdown(self) -> None:
+        await self.calibrator.stop()
         if self.webui is not None:
             with contextlib.suppress(Exception):
                 await self.webui.stop()

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+- **Einmessen mit ESP32-Mikrofon:** Neue ESPHome-Komponente
+  `sendspin_latency_mic` und Bereich „Einmessen“ in der Geräteverwaltung. Das
+  Add-on spielt eine Tonfolge über MA ab, der ESP32 nimmt sie mit Zeitstempel
+  auf; nach Uhrenabgleich ergibt sich die Latenz pro Box. Tabelle mit Ausgleich
+  zur langsamsten Box; eine Messung lässt sich als Standard-Verzögerung für alle
+  Zuspieler übernehmen.
+- Neue Optionen `calibration_mic`, `calibration_key`, `mic_offset_ms`.
+
 ## 0.7.2
 
 - Verzögerung bis 6000 ms einstellbar (vorher 3000 ms; der Beamer brauchte mehr).
